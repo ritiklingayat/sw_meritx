@@ -1,0 +1,562 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+  SUPERADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String?
+  role          Role      @default(STUDENT)
+  googleSubject String?   @unique
+  target        String?
+  city          String?
+  academicYear  String?
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile           UserProfile?
+  sessions          UserSession[]
+  courseEnrollments CourseEnrollment[]
+  registrations     ExamRegistration[]
+  attempts          ExamAttempt[]
+  wallet            Wallet?
+  tickets           SupportTicket[]
+  auditLogs         AuditLog[]
+  createdBanks      QuestionBank[]     @relation("BankAuthor")
+  reviewedBanks     QuestionBank[]     @relation("BankReviewer")
+
+  @@index([role])
+}
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  phone           String?
+  bio             String?
+  targetExam      String?
+  city            String?
+  state           String?
+  academicYear    String?
+  designation     String?
+  department      String?
+  specialization  String?
+  experienceYears Int?
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Course {
+  id                   String   @id
+  slug                 String   @unique
+  name                 String
+  category             String
+  examType             String
+  shortDescription     String?
+  fullDescription      String?
+  fee                  Int      @default(0) // in paise
+  discountPercent      Int      @default(0)
+  effectivePrice       Int      @default(0) // in paise
+  durationDays         Int      @default(180)
+  mockTestCount        Int      @default(10)
+  publishedExamCount   Int      @default(0)
+  enrolledStudentCount Int      @default(0)
+  status               String   @default("published")
+  isVisible            Boolean  @default(true)
+  isFeatured           Boolean  @default(false)
+  displayOrder         Int      @default(99)
+  teacherId            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  enrollments CourseEnrollment[]
+  exams       Exam[]
+
+  @@index([status, isVisible])
+  @@index([category])
+}
+
+model CourseEnrollment {
+  id            String   @id @default(cuid())
+  studentId     String
+  courseId      String
+  feePaid       Int      @default(0) // in paise
+  paymentMethod String   @default("wallet")
+  transactionId String?
+  status        String   @default("active")
+  enrolledAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model ExamPattern {
+  id            String   @id
+  code          String
+  name          String
+  version       Int      @default(1)
+  officialYear  Int      @default(2026)
+  configuration Json
+  status        String   @default("active")
+  isBuiltin     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  exams Exam[]
+
+  @@unique([code, version])
+}
+
+model Exam {
+  id                 String   @id
+  patternId          String?
+  courseId           String?
+  bankId             String?  @unique
+  title              String
+  type               String
+  category           String
+  subject            String
+  date               String?
+  time               String?
+  duration           Int // minutes
+  questionsCount     Int      @default(0)
+  marks              Int      @default(300)
+  passingMarks       Int      @default(120)
+  negativeMarking    Boolean  @default(true)
+  maxAttempts        Int      @default(1)
+  proctoringRequired Boolean  @default(true)
+  fee                Int      @default(0) // in paise
+  tag                String?
+  description        String?
+  syllabus           String?
+  status             String   @default("published")
+  registrationOpen   Boolean  @default(true)
+  imageUrl           String?
+  bannerImageUrl     String?
+  schedule           Json?
+  configuration      Json?
+  registeredCount    Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  pattern       ExamPattern?       @relation(fields: [patternId], references: [id], onDelete: SetNull)
+  course        Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  registrations ExamRegistration[]
+  attempts      ExamAttempt[]
+
+  @@index([status, registrationOpen])
+  @@index([type])
+}
+
+model QuestionBank {
+  id                 String    @id @default(cuid())
+  title              String
+  subject            String
+  sourceFilename     String?
+  sourceType         String?
+  extractionStatus   String    @default("ready")
+  extractionWarnings Json?
+  status             String    @default("draft") // draft, submitted, approved, published, rejected
+  rejectionReason    String?
+  version            Int       @default(1)
+  createdById        String
+  approvedById       String?
+  assignedExamId     String?
+  publishedAt        DateTime?
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  createdBy   User                     @relation("BankAuthor", fields: [createdById], references: [id], onDelete: Cascade)
+  approvedBy  User?                    @relation("BankReviewer", fields: [approvedById], references: [id], onDelete: SetNull)
+  questions   Question[]
+  auditEvents QuestionBankAuditEvent[]
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model Question {
+  id                  String   @id @default(cuid())
+  bankId              String?
+  externalId          String?
+  position            Int      @default(0)
+  subject             String
+  chapter             String?
+  topic               String?
+  difficulty          String   @default("Medium")
+  questionType        String   @default("single_correct") // single_correct, multiple_correct, numerical, matching_list, linked_numerical
+  text                String
+  options             Json // array of string options
+  answer              Int? // 0-indexed correct option
+  correctOption       Int?
+  correctOptions      Json? // array of indices e.g. [0, 1]
+  numericalAnswer     Float?
+  numericalTolerance  Float?   @default(0.01)
+  explanation         String?
+  imageUrl            String?
+  optionImageUrls     Json?
+  contentHash         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  bank QuestionBank? @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@index([bankId, position])
+  @@index([subject])
+}
+
+model QuestionBankAuditEvent {
+  id        String   @id @default(cuid())
+  bankId    String
+  actorId   String?
+  eventType String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  bank QuestionBank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@index([bankId])
+}
+
+model ExamRegistration {
+  id            String   @id @default(cuid())
+  studentId     String
+  examId        String
+  amountPaid    Int      @default(0) // in paise
+  paymentStatus String   @default("successful")
+  status        String   @default("confirmed")
+  registeredAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam    Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, examId])
+  @@index([studentId])
+  @@index([examId])
+}
+
+model ExamAttempt {
+  id                 String    @id @default(cuid())
+  studentId          String
+  examId             String
+  status             String    @default("in_progress") // in_progress, submitted, TERMINATED, AUTO_SUBMITTED
+  answers            Json      @default("{}")
+  marked             Json      @default("[]")
+  visited            Json      @default("[0]")
+  durationSeconds    Int       @default(7200)
+  startedAt          DateTime  @default(now())
+  lastSavedAt        DateTime?
+  submittedAt        DateTime?
+  terminatedAt       DateTime?
+  deadlineAt         DateTime?
+  timeTaken          Int?
+  warningCount       Int       @default(0)
+  isFlagged          Boolean   @default(false)
+  flagReason         String?
+  terminationReason  String?
+  proctoringStatus   String    @default("monitored")
+  questionSnapshot   Json
+  currentSegment     Int       @default(1)
+  segmentStartedAt   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  student           User               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam              Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  result            ExamResult?
+  proctoringSession ProctoringSession?
+
+  @@unique([studentId, examId])
+  @@index([studentId])
+  @@index([examId])
+  @@index([status])
+}
+
+model ExamResult {
+  id           String   @id @default(cuid())
+  attemptId    String   @unique
+  examId       String
+  studentId    String
+  score        Float    @default(0)
+  maximumMarks Int      @default(300)
+  percentage   Float    @default(0)
+  accuracy     Float    @default(0)
+  attempted    Int      @default(0)
+  correct      Int      @default(0)
+  incorrect    Int      @default(0)
+  unattempted  Int      @default(0)
+  details      Json
+  createdAt    DateTime @default(now())
+
+  attempt ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([studentId])
+}
+
+model Wallet {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  balancePaise       BigInt   @default(0) // Integer paise
+  lockedPaise        BigInt   @default(0)
+  dmcCredits         BigInt   @default(0) // Virtual non-monetary credits
+  currency           String   @default("INR")
+  status             String   @default("active")
+  totalWithdrawnPaise BigInt  @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  WalletTransaction[]
+  ledgerEntries WalletLedgerEntry[]
+  withdrawals   WithdrawalRequest[]
+}
+
+model WalletTransaction {
+  id                 String   @id @default(cuid())
+  walletId           String
+  userId             String
+  type               String // credit, debit, withdrawal, deposit, prize
+  direction          String // credit, debit
+  amountPaise        BigInt
+  balanceBeforePaise BigInt
+  balanceAfterPaise  BigInt
+  status             String   @default("successful")
+  referenceId        String?  @unique
+  description        String
+  metadata           Json?
+  createdAt          DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model WalletLedgerEntry {
+  id                String   @id @default(cuid())
+  walletId          String
+  transactionKey    String   @unique
+  entryType         String // DEBIT, CREDIT
+  category          String // DEPOSIT, EXAM_REGISTRATION, COURSE_PURCHASE, WITHDRAWAL, DEMO_CREDIT
+  amountPaise       BigInt
+  balanceAfterPaise BigInt
+  memo              String
+  createdAt         DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+}
+
+model Payment {
+  id               String    @id @default(cuid())
+  userId           String
+  purpose          String    @default("exam_registration")
+  targetId         String?
+  amountPaise      BigInt
+  currency         String    @default("INR")
+  status           String    @default("created") // created, attempted, captured, failed, refunded
+  gateway          String    @default("Razorpay")
+  gatewayOrderId   String?   @unique
+  gatewayPaymentId String?   @unique
+  gatewaySignature String?
+  idempotencyKey   String?   @unique
+  failureReason    String?
+  verifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  refunds PaymentRefund[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model PaymentRefund {
+  id          String   @id @default(cuid())
+  paymentId   String
+  amountPaise BigInt
+  reason      String
+  status      String   @default("completed")
+  createdAt   DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+model WithdrawalRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  walletId        String
+  amountPaise     BigInt
+  payoutMethod    String // upi, bank_transfer
+  payoutDetails   Json
+  status          String    @default("pending") // pending, processing, approved, completed, rejected
+  referenceNumber String?   @unique
+  adminNotes      String?
+  rejectionReason String?
+  processedBy     String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ProctoringSession {
+  id               String   @id @default(cuid())
+  attemptId        String   @unique
+  examId           String
+  studentId        String
+  cameraStatus     String   @default("active")
+  micStatus        String   @default("active")
+  fullscreenStatus String   @default("locked")
+  warningCount     Int      @default(0)
+  isFlagged        Boolean  @default(false)
+  lastHeartbeatAt  DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  attempt  ExamAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  events   ProctoringEvent[]
+  warnings ProctoringWarning[]
+
+  @@index([examId])
+  @@index([studentId])
+}
+
+model ProctoringEvent {
+  id          String   @id @default(cuid())
+  sessionId   String?
+  attemptId   String
+  studentId   String
+  examId      String
+  eventType   String
+  severity    String   @default("warning")
+  description String
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  session ProctoringSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, createdAt(sort: Desc)])
+  @@index([studentId])
+  @@index([eventType])
+}
+
+model ProctoringWarning {
+  id            String   @id @default(cuid())
+  sessionId     String?
+  attemptId     String
+  studentId     String
+  examId        String
+  warningNumber Int
+  category      String
+  message       String
+  createdAt     DateTime @default(now())
+
+  session ProctoringSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+}
+
+model SupportTicket {
+  id         String   @id @default(cuid())
+  userId     String
+  userName   String?
+  subject    String
+  message    String
+  status     String   @default("open")
+  adminNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
+
+model LandingPageContent {
+  key       String   @id
+  payload   Json
+  updatedAt DateTime @updatedAt
+}
+
+model PlatformMasterLedger {
+  id                String   @id @default(cuid())
+  transactionKey    String   @unique
+  category          String
+  type              String
+  direction         String
+  amountPaise       BigInt
+  balanceAfterPaise BigInt
+  referenceId       String?
+  description       String
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  @@index([category])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  detail    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+}

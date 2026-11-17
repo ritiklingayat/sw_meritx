@@ -1,0 +1,137 @@
+[
+  {
+    "id": "pattern-jee-main-2026-v1",
+    "code": "jee-main-2026",
+    "name": "JEE Main Paper 1 2026",
+    "version": 1,
+    "officialYear": 2026,
+    "configuration": {
+      "durationMinutes": 180,
+      "questionCount": 75,
+      "maximumMarks": 300,
+      "papers": 1,
+      "subjects": ["Physics", "Chemistry", "Mathematics"],
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 },
+        "numerical": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "strict": {
+        "perSubject": { "single_correct": 20, "numerical": 5 }
+      },
+      "instructions": [
+        "Each subject contains 20 single-correct MCQs and compulsory numerical-value questions.",
+        "Incorrect MCQ and numerical responses receive one negative mark (-1).",
+        "Unanswered questions receive 0 marks."
+      ]
+    },
+    "status": "active",
+    "builtIn": true
+  },
+  {
+    "id": "pattern-neet-ug-2026-v1",
+    "code": "neet-ug-2026",
+    "name": "NEET UG 2026",
+    "version": 1,
+    "officialYear": 2026,
+    "configuration": {
+      "durationMinutes": 180,
+      "questionCount": 180,
+      "maximumMarks": 720,
+      "papers": 1,
+      "subjects": ["Physics", "Chemistry", "Biology"],
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "strict": {
+        "subjectCounts": { "Physics": 45, "Chemistry": 45, "Biology": 90 }
+      },
+      "instructions": [
+        "The question paper contains 180 questions across Physics, Chemistry, and Biology.",
+        "4 marks are awarded for each correct response, and 1 mark is deducted for each incorrect response.",
+        "Use the question palette to jump between subjects and questions at any time."
+      ]
+    },
+    "status": "active",
+    "builtIn": true
+  },
+  {
+    "id": "pattern-jee-advanced-2026-v1",
+    "code": "jee-advanced-2026",
+    "name": "JEE Advanced 2026",
+    "version": 1,
+    "officialYear": 2026,
+    "configuration": {
+      "durationMinutes": 180,
+      "questionCount": 54,
+      "maximumMarks": 216,
+      "papers": 1,
+      "subjects": ["Physics", "Chemistry", "Mathematics"],
+      "rules": {
+        "single_correct": { "correct": 3, "incorrect": -1, "unanswered": 0 },
+        "multiple_correct": { "correct": 4, "incorrect": -1, "unanswered": 0, "partial": true },
+        "numerical": { "correct": 4, "incorrect": 0, "unanswered": 0 }
+      },
+      "instructions": [
+        "Carefully check if question is Single Choice or Multiple Choice before answering.",
+        "Multiple Choice questions may have one or more options correct with partial marks.",
+        "Incorrect responses deduct 1 mark in MCQ sections."
+      ]
+    },
+    "status": "active",
+    "builtIn": true
+  },
+  {
+    "id": "pattern-tech-v1",
+    "code": "tech-assessment-v1",
+    "name": "Technical Assessment Pattern",
+    "version": 1,
+    "officialYear": 2026,
+    "configuration": {
+      "durationMinutes": 60,
+      "questionCount": 30,
+      "maximumMarks": 120,
+      "papers": 1,
+      "subjects": ["Computer Science"],
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "30 multiple-choice questions focusing on code syntax, output prediction, and algorithm design.",
+        "Marking: +4 correct, -1 incorrect for single correct responses."
+      ]
+    },
+    "status": "active",
+    "builtIn": true
+  },
+  {
+    "id": "pattern-mht-cet-pcm-2026-v1",
+    "code": "mht-cet-pcm-2026",
+    "name": "MHT-CET PCM 2026",
+    "version": 1,
+    "officialYear": 2026,
+    "configuration": {
+      "durationMinutes": 180,
+      "questionCount": 150,
+      "maximumMarks": 200,
+      "papers": 2,
+      "subjects": ["Physics", "Chemistry", "Mathematics"],
+      "rules": {
+        "single_correct": { "correct": 1, "incorrect": 0, "unanswered": 0 },
+        "subjectOverrides": {
+          "Mathematics": { "correct": 2, "incorrect": 0 }
+        }
+      },
+      "phases": [
+        { "name": "Physics & Chemistry", "durationMinutes": 90, "subjects": ["Physics", "Chemistry"] },
+        { "name": "Mathematics", "durationMinutes": 90, "subjects": ["Mathematics"] }
+      ],
+      "instructions": [
+        "Two phases of 90 minutes each.",
+        "Phase 1: Physics and Chemistry (50 + 50 = 100 questions, 1 mark each, no negative marking).",
+        "Phase 2: Mathematics (50 questions, 2 marks each, no negative marking)."
+      ]
+    },
+    "status": "active",
+    "builtIn": true
+  }
+]

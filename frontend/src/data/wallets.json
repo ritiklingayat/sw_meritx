@@ -1,0 +1,98 @@
+{
+  "masterWallet": {
+    "totalRevenue": 482500,
+    "availableBalance": 341850,
+    "pendingPayouts": 42000,
+    "completedPayouts": 98650,
+    "activeSubscriptions": 894,
+    "currency": "INR"
+  },
+  "wallets": [
+    {
+      "studentId": "student-1",
+      "balance": 1500,
+      "currency": "INR",
+      "lockedBalance": 0
+    },
+    {
+      "studentId": "student-2",
+      "balance": 850,
+      "currency": "INR",
+      "lockedBalance": 0
+    }
+  ],
+  "deposits": [
+    {
+      "id": "dep-001",
+      "studentId": "student-1",
+      "amount": 1000,
+      "status": "completed",
+      "gateway": "UPI / NetBanking (Demo)",
+      "orderId": "order_d_1001",
+      "createdAt": "2026-10-15T11:20:00.000Z"
+    },
+    {
+      "id": "dep-002",
+      "studentId": "student-1",
+      "amount": 500,
+      "status": "completed",
+      "gateway": "Card Payment (Demo)",
+      "orderId": "order_d_1002",
+      "createdAt": "2026-10-22T14:10:00.000Z"
+    }
+  ],
+  "withdrawals": [
+    {
+      "id": "wd-001",
+      "studentId": "student-1",
+      "amount": 400,
+      "status": "approved",
+      "upiId": "aarav@oksbi",
+      "accountHolder": "Aarav Sharma",
+      "createdAt": "2026-10-20T09:45:00.000Z"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "tkt-001",
+      "userId": "student-1",
+      "userName": "Aarav Sharma",
+      "subject": "Question 4 marking clarity in JEE Mock",
+      "message": "Is question 4 partial marking enabled in the official JEE Advanced pattern?",
+      "status": "open",
+      "createdAt": "2026-10-24T12:00:00.000Z"
+    },
+    {
+      "id": "tkt-002",
+      "userId": "student-2",
+      "userName": "Priya Patel",
+      "subject": "NEET Mock timer query",
+      "message": "Will there be sectional timers for Botany and Zoology in future updates?",
+      "status": "closed",
+      "createdAt": "2026-10-21T16:30:00.000Z"
+    }
+  ],
+  "audit": [
+    {
+      "id": "aud-1",
+      "actorName": "Operations Admin",
+      "action": "EXAM_PUBLISHED",
+      "detail": "Published JEE Main Grand Mock 01",
+      "createdAt": "2026-10-25T10:15:00.000Z"
+    },
+    {
+      "id": "aud-2",
+      "actorName": "Dr. Meera Joshi",
+      "action": "BANK_CREATED",
+      "detail": "Created Physics & Chemistry question bank",
+      "createdAt": "2026-10-24T14:20:00.000Z"
+    },
+    {
+      "id": "aud-3",
+      "actorName": "Finance Director",
+      "action": "PAYOUT_APPROVED",
+      "detail": "Approved student scholarship prize credit of ₹2,500",
+      "createdAt": "2026-10-23T11:00:00.000Z"
+    }
+  ]
+}

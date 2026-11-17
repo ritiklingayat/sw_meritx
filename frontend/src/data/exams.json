@@ -1,0 +1,221 @@
+[
+  {
+    "id": "java-assessment-01",
+    "patternId": "pattern-tech-v1",
+    "title": "Java & Core Programming Assessment",
+    "type": "Technical Assessment",
+    "category": "Programming & Tech",
+    "subject": "Java · OOP · Data Structures",
+    "date": "2026-11-04",
+    "time": "08:00 AM",
+    "duration": 60,
+    "questions": 30,
+    "marks": 120,
+    "passingMarks": 60,
+    "negativeMarking": true,
+    "maxAttempts": 1,
+    "proctoringRequired": true,
+    "registered": 840,
+    "fee": 0,
+    "tag": "Live Now",
+    "description": "Industry-standard Java skills assessment evaluating core OOP concepts, multithreading, exception handling, and algorithms.",
+    "syllabus": "Java SE 17+, Object-Oriented Design, Collections Framework, Time Complexity",
+    "status": "published",
+    "registrationOpen": true,
+    "imageUrl": null,
+    "bannerImageUrl": "/src/assets/Images/Courses/1-display.jpg",
+    "schedule": {
+      "startsAt": "2026-11-04T08:00:00+05:30",
+      "endsAt": "2026-11-04T23:59:00+05:30",
+      "registrationOpensAt": "2026-10-25T10:00:00+05:30",
+      "registrationClosesAt": "2026-11-04T22:00:00+05:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "configuration": {
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "30 multiple-choice questions focusing on code syntax, output prediction, and algorithm design.",
+        "Marking: +4 correct, -1 incorrect for single correct responses.",
+        "Candidate attempt duration is 60 minutes, constrained by the closing window at 11:59 PM.",
+        "Proctored environment: camera and microphone stream verification is required before starting."
+      ]
+    }
+  },
+  {
+    "id": "neet-biology-01",
+    "patternId": "pattern-neet-ug-2026-v1",
+    "title": "NEET Biology Sprint Mock",
+    "type": "NEET UG",
+    "category": "Medical Entrance",
+    "subject": "Botany · Zoology",
+    "date": "2026-11-04",
+    "time": "06:00 PM",
+    "duration": 90,
+    "questions": 45,
+    "marks": 180,
+    "passingMarks": 90,
+    "negativeMarking": true,
+    "maxAttempts": 1,
+    "proctoringRequired": false,
+    "registered": 1890,
+    "fee": 0,
+    "tag": "Starting Soon",
+    "description": "Fast-paced high-yield biology mock focusing heavily on human physiology, genetics, plant anatomy, and cell biology.",
+    "syllabus": "Class 11 & 12 Botany and Zoology NCERT",
+    "status": "published",
+    "registrationOpen": true,
+    "imageUrl": null,
+    "bannerImageUrl": "/src/assets/Images/Courses/4-display.jpg",
+    "schedule": {
+      "startsAt": "2026-11-04T18:00:00+05:30",
+      "endsAt": "2026-11-04T20:00:00+05:30",
+      "registrationOpensAt": "2026-10-20T10:00:00+05:30",
+      "registrationClosesAt": "2026-11-04T17:55:00+05:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "configuration": {
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "45 high-yield biology questions across Botany and Zoology.",
+        "Marking: +4 for correct response, -1 for incorrect response.",
+        "Complete and submit within 90 minutes. No camera required for this practice sprint."
+      ]
+    }
+  },
+  {
+    "id": "jee-main-01",
+    "patternId": "pattern-jee-main-2026-v1",
+    "title": "JEE Main Grand Mock 01",
+    "type": "JEE Main",
+    "category": "Engineering Entrance",
+    "subject": "Physics · Chemistry · Mathematics",
+    "date": "2026-11-15",
+    "time": "10:00 AM",
+    "duration": 180,
+    "questions": 75,
+    "marks": 300,
+    "passingMarks": 120,
+    "negativeMarking": true,
+    "maxAttempts": 1,
+    "proctoringRequired": true,
+    "registered": 2486,
+    "fee": 2,
+    "tag": "Most popular",
+    "description": "National-level JEE Main simulation benchmark test featuring authentic NTA difficulty, time constraints, and multi-subject balance.",
+    "syllabus": "Complete Class 11 & 12 Physics, Chemistry, and Mathematics",
+    "status": "published",
+    "registrationOpen": true,
+    "imageUrl": null,
+    "bannerImageUrl": "/src/assets/Images/Courses/1-display.jpg",
+    "schedule": {
+      "startsAt": "2026-11-15T10:00:00+05:30",
+      "endsAt": "2026-11-15T13:00:00+05:30",
+      "registrationOpensAt": "2026-11-01T10:00:00+05:30",
+      "registrationClosesAt": "2026-11-14T18:00:00+05:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "configuration": {
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 },
+        "numerical": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "The examination contains 75 total questions across Physics, Chemistry, and Mathematics.",
+        "Each correct MCQ earns +4 marks. An incorrect MCQ deducts -1 mark.",
+        "Proctoring is active: webcam and audio will be monitored throughout the attempt.",
+        "Leaving fullscreen or switching tabs triggers violation alerts."
+      ]
+    }
+  },
+  {
+    "id": "jee-advanced-01",
+    "patternId": "pattern-jee-advanced-2026-v1",
+    "title": "JEE Advanced Challenge 01",
+    "type": "JEE Advanced",
+    "category": "Engineering Entrance",
+    "subject": "Physics · Chemistry · Mathematics",
+    "date": "2026-12-06",
+    "time": "09:00 AM",
+    "duration": 180,
+    "questions": 54,
+    "marks": 216,
+    "passingMarks": 90,
+    "negativeMarking": true,
+    "maxAttempts": 1,
+    "proctoringRequired": true,
+    "registered": 1240,
+    "fee": 129,
+    "tag": "Advanced",
+    "description": "High-rigor challenge tailored for premier engineering aspirants featuring complex multi-concept single and multiple choice questions.",
+    "syllabus": "Advanced PCM topics with multi-step analytical problems",
+    "status": "published",
+    "registrationOpen": true,
+    "imageUrl": null,
+    "bannerImageUrl": "/src/assets/Images/Courses/3-display.jpg",
+    "schedule": {
+      "startsAt": "2026-12-06T09:00:00+05:30",
+      "endsAt": "2026-12-06T12:00:00+05:30",
+      "registrationOpensAt": "2026-11-10T10:00:00+05:30",
+      "registrationClosesAt": "2026-12-05T18:00:00+05:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "configuration": {
+      "rules": {
+        "single_correct": { "correct": 3, "incorrect": -1, "unanswered": 0 },
+        "multiple_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "Questions require deep conceptual clarity and careful multi-option verification.",
+        "Multiple correct questions require selecting all true choices.",
+        "Proctored environment with automatic violation capture."
+      ]
+    }
+  },
+  {
+    "id": "neet-01",
+    "patternId": "pattern-neet-ug-2026-v1",
+    "title": "NEET UG All India Test 01",
+    "type": "NEET UG",
+    "category": "Medical Entrance",
+    "subject": "Physics · Chemistry · Biology",
+    "date": "2026-11-02",
+    "time": "10:00 AM",
+    "duration": 180,
+    "questions": 180,
+    "marks": 720,
+    "passingMarks": 360,
+    "negativeMarking": true,
+    "maxAttempts": 1,
+    "proctoringRequired": true,
+    "registered": 3912,
+    "fee": 149,
+    "tag": "Completed",
+    "description": "Full-length 720-marks NEET UG standard simulation test adhering strictly to the NCERT biology curriculum and medical entrance standards.",
+    "syllabus": "Class 11 & 12 Botany, Zoology, Physics, and Chemistry",
+    "status": "published",
+    "registrationOpen": false,
+    "imageUrl": null,
+    "bannerImageUrl": "/src/assets/Images/Courses/2-display.jpg",
+    "schedule": {
+      "startsAt": "2026-11-02T10:00:00+05:30",
+      "endsAt": "2026-11-02T13:00:00+05:30",
+      "registrationOpensAt": "2026-10-15T10:00:00+05:30",
+      "registrationClosesAt": "2026-11-01T18:00:00+05:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "configuration": {
+      "rules": {
+        "single_correct": { "correct": 4, "incorrect": -1, "unanswered": 0 }
+      },
+      "instructions": [
+        "180 single-correct multiple-choice questions.",
+        "Correct answer awards 4 marks. Incorrect answer deducts 1 mark.",
+        "Navigate seamlessly between Botany, Zoology, Physics, and Chemistry using the section tabs."
+      ]
+    }
+  }
+]
