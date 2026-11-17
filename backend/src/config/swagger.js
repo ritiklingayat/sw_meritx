@@ -5,7 +5,7 @@ export const swaggerDocument = {
   info: {
     title: 'MERITX Online Examination Platform API',
     version: '2.0.0',
-    description: 'Production REST API for LGW MERITX competitive examination platform powered by Node.js, Express, Neon PostgreSQL, and Prisma ORM.'
+    description: 'Production REST API for SW MERITX competitive examination platform powered by Node.js, Express, Neon PostgreSQL, and Prisma ORM.'
   },
   servers: [
     {

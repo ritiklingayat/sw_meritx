@@ -141,7 +141,7 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
           key: orderRes.keyId,
           amount: orderRes.amountPaise || Math.round(Number(amount) * 100),
           currency: "INR",
-          name: "LGW MERITX",
+          name: "SW MERITX",
           description: "Student Wallet Recharge",
           order_id: orderRes.orderId && !orderRes.orderId.includes("test") ? orderRes.orderId : undefined,
           prefill: {
@@ -1779,7 +1779,7 @@ export function AddMoney() {
           key: orderRes.keyId,
           amount: orderRes.amountPaise || Math.round(Number(amount) * 100),
           currency: "INR",
-          name: "LGW MERITX",
+          name: "SW MERITX",
           description: "Wallet Balance Top-Up",
           order_id: orderRes.orderId && !orderRes.orderId.includes("test") ? orderRes.orderId : undefined,
           prefill: {

@@ -145,7 +145,10 @@ export class WalletService {
           body: JSON.stringify({
             amount: Number(amountPaise),
             currency: 'INR',
-            receipt: `rcpt_${Date.now()}`
+            receipt: `rcpt_${Date.now()}`,
+            notes: {
+              platform: 'SW MERITX'
+            }
           })
         });
 
