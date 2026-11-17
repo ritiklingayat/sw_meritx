@@ -125,15 +125,118 @@ export class WalletService {
     }
 
     const amountPaise = BigInt(Math.round(numAmount * 100));
-    const orderId = `order_${Date.now()}`;
+    let orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // If real Razorpay credentials are provided, call Razorpay Orders API
+    if (
+      env.RAZORPAY_KEY_ID &&
+      env.RAZORPAY_KEY_SECRET &&
+      !env.RAZORPAY_KEY_ID.includes('demo') &&
+      !env.RAZORPAY_KEY_SECRET.includes('demo')
+    ) {
+      try {
+        const auth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString('base64');
+        const res = await fetch('https://api.razorpay.com/v1/orders', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: Number(amountPaise),
+            currency: 'INR',
+            receipt: `rcpt_${Date.now()}`
+          })
+        });
+
+        if (res.ok) {
+          const rzpOrder = await res.json();
+          orderId = rzpOrder.id;
+        }
+      } catch (err) {
+        console.warn('[Razorpay] Orders API notice, fallback to local order:', err.message);
+      }
+    }
+
+    // Save payment record
+    await prisma.payment.create({
+      data: {
+        userId,
+        purpose: 'wallet_deposit',
+        amountPaise,
+        currency: 'INR',
+        gateway: 'Razorpay',
+        gatewayOrderId: orderId,
+        status: 'created'
+      }
+    }).catch(() => null);
 
     return {
       orderId,
       amount: numAmount,
       amountPaise: Number(amountPaise),
       currency: 'INR',
-      keyId: env.RAZORPAY_KEY_ID
+      keyId: env.RAZORPAY_KEY_ID || 'rzp_test_meritx_demo'
     };
+  }
+
+  static async creditReward({ userId, amount, examTitle = 'Competitive Mock Examination', memo = 'Merit Prize Reward' }) {
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return null;
+
+    const amountPaise = BigInt(Math.round(numAmount * 100));
+
+    return prisma.$transaction(async (tx) => {
+      let wallet = await tx.wallet.findUnique({ where: { userId } });
+      if (!wallet) {
+        wallet = await tx.wallet.create({
+          data: { userId, balancePaise: BigInt(0), currency: 'INR' }
+        });
+      }
+
+      const balanceBefore = wallet.balancePaise;
+      const balanceAfter = balanceBefore + amountPaise;
+
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { balancePaise: balanceAfter }
+      });
+
+      const refId = `REW-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const walletTx = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          userId,
+          type: 'reward',
+          direction: 'credit',
+          amountPaise,
+          balanceBeforePaise: balanceBefore,
+          balanceAfterPaise: balanceAfter,
+          status: 'successful',
+          referenceId: refId,
+          description: `Merit Reward: ${examTitle}`
+        }
+      });
+
+      await tx.walletLedgerEntry.create({
+        data: {
+          walletId: wallet.id,
+          transactionKey: `LEDGER-${refId}`,
+          entryType: 'CREDIT',
+          category: 'PRIZE_REWARD',
+          amountPaise,
+          balanceAfterPaise: balanceAfter,
+          memo: `${memo}: ₹${numAmount} for ${examTitle}`
+        }
+      });
+
+      return {
+        success: true,
+        rewardAmount: numAmount,
+        newBalance: Number(balanceAfter) / 100,
+        transaction: walletTx
+      };
+    });
   }
 
   static async addMoney({ userId, amount = 500, method = 'UPI / Instant Demo Recharge' }) {

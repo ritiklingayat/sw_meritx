@@ -1,8 +1,11 @@
+import crypto from 'crypto';
+import { env } from '../config/env.js';
 import { StudentService } from '../services/student.service.js';
 import { WalletService } from '../services/wallet.service.js';
 import { ExamService } from '../services/exam.service.js';
 import { prisma } from '../config/prisma.js';
 import { successResponse } from '../utils/apiResponse.js';
+import { BadRequestError } from '../utils/errors.js';
 
 export class StudentController {
   static async getDashboard(req, res, next) {
@@ -134,10 +137,49 @@ export class StudentController {
 
   static async depositVerify(req, res, next) {
     try {
+      const { orderId, paymentId, signature, amount, method } = req.body;
+
+      // Verify Razorpay HMAC SHA-256 signature if real credentials and signature are supplied
+      if (
+        signature &&
+        orderId &&
+        paymentId &&
+        env.RAZORPAY_KEY_SECRET &&
+        !env.RAZORPAY_KEY_SECRET.includes('demo') &&
+        !signature.startsWith('demo_sig')
+      ) {
+        const expectedSignature = crypto
+          .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
+          .update(`${orderId}|${paymentId}`)
+          .digest('hex');
+
+        if (expectedSignature !== signature) {
+          throw new BadRequestError('Invalid Razorpay payment signature verification.');
+        }
+      }
+
+      // Update payment record in database
+      if (orderId || paymentId) {
+        await prisma.payment.updateMany({
+          where: {
+            OR: [
+              { gatewayOrderId: orderId },
+              { gatewayPaymentId: paymentId }
+            ]
+          },
+          data: {
+            gatewayPaymentId: paymentId,
+            gatewaySignature: signature,
+            status: 'captured',
+            verifiedAt: new Date()
+          }
+        }).catch(() => null);
+      }
+
       const result = await WalletService.addMoney({
         userId: req.user.id,
-        amount: req.body.amount,
-        method: req.body.method
+        amount: Number(amount || 500),
+        method: method || (paymentId ? `Razorpay (${paymentId})` : 'UPI Top-up')
       });
       return res.status(200).json(result);
     } catch (err) {

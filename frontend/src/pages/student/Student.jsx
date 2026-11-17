@@ -89,13 +89,26 @@ export function useWallet() {
   return { wallet, error, loading, refresh, token };
 }
 
+export function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.Razorpay) {
+      return resolve(true);
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 /* ==========================================================================
-   Add Money Modal (Simulated Demo Wallet Top-Up)
+   Add Money Modal (Razorpay Gateway & Demo Top-Up Flow)
    ========================================================================== */
 export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 0 }) {
   const { token, user } = useAuth();
   const [amount, setAmount] = useState(500);
-  const [method, setMethod] = useState("UPI Demo Instant");
+  const [method, setMethod] = useState("UPI / Razorpay");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
@@ -104,13 +117,94 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
 
   async function handleTopUp(e) {
     if (e) e.preventDefault();
+    if (!amount || Number(amount) < 10) {
+      setError("Minimum recharge amount is ₹10.");
+      return;
+    }
     setBusy(true);
     setError("");
+
     try {
-      const res = await api("/me/wallet/deposit", {
+      // 1. Create deposit order
+      const orderRes = await api("/me/wallet/deposit/order", {
         method: "POST",
         token,
-        body: { amount: Number(amount), method }
+        body: { amount: Number(amount) }
+      });
+
+      // 2. Load Razorpay script
+      const sdkReady = await loadRazorpayScript();
+
+      // If Razorpay SDK is ready and keyId is configured
+      if (sdkReady && window.Razorpay && orderRes.keyId && !orderRes.keyId.includes("demo")) {
+        const options = {
+          key: orderRes.keyId,
+          amount: orderRes.amountPaise || Math.round(Number(amount) * 100),
+          currency: "INR",
+          name: "LGW MERITX",
+          description: "Student Wallet Recharge",
+          order_id: orderRes.orderId && !orderRes.orderId.includes("test") ? orderRes.orderId : undefined,
+          prefill: {
+            name: user?.name || "Student",
+            email: user?.email || "",
+            contact: user?.phone || ""
+          },
+          theme: {
+            color: "#2563eb"
+          },
+          handler: async function (response) {
+            setBusy(true);
+            try {
+              const verifyRes = await api("/me/wallet/deposit/verify", {
+                method: "POST",
+                token,
+                body: {
+                  amount: Number(amount),
+                  orderId: response.razorpay_order_id || orderRes.orderId,
+                  paymentId: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                  method: "Razorpay Payment Gateway"
+                }
+              });
+              setSuccess(verifyRes);
+              if (onMoneyAdded) onMoneyAdded(verifyRes.newBalance);
+              setTimeout(() => {
+                onClose();
+                setSuccess(null);
+              }, 1200);
+            } catch (err) {
+              setError(err.message || "Payment verification failed.");
+            } finally {
+              setBusy(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setBusy(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (response) {
+          setError(response.error?.description || "Payment was cancelled or failed.");
+          setBusy(false);
+        });
+        rzp.open();
+        return;
+      }
+
+      // Fast test/demo recharge fallback
+      const res = await api("/me/wallet/deposit/verify", {
+        method: "POST",
+        token,
+        body: {
+          amount: Number(amount),
+          orderId: orderRes.orderId,
+          paymentId: `pay_test_${Date.now()}`,
+          signature: "demo_sig_verified",
+          method: "Instant Wallet Recharge (UPI/Demo)"
+        }
       });
       setSuccess(res);
       if (onMoneyAdded) onMoneyAdded(res.newBalance || (currentBalance + Number(amount)));
@@ -1674,17 +1768,73 @@ export function AddMoney() {
       const orderRes = await api("/me/wallet/deposit/order", {
         method: "POST",
         token,
-        body: { amount: Number(amount), paymentMethod: method },
+        body: { amount: Number(amount) },
       });
 
-      // 2. Simulate payment gateway verification (Demo Mode)
+      // 2. Load Razorpay script
+      const sdkReady = await loadRazorpayScript();
+
+      if (sdkReady && window.Razorpay && orderRes.keyId && !orderRes.keyId.includes("demo")) {
+        const options = {
+          key: orderRes.keyId,
+          amount: orderRes.amountPaise || Math.round(Number(amount) * 100),
+          currency: "INR",
+          name: "LGW MERITX",
+          description: "Wallet Balance Top-Up",
+          order_id: orderRes.orderId && !orderRes.orderId.includes("test") ? orderRes.orderId : undefined,
+          prefill: {
+            name: wallet?.user?.name || "Student",
+            email: wallet?.user?.email || "",
+          },
+          theme: { color: "#2563eb" },
+          handler: async function (response) {
+            setBusy(true);
+            try {
+              const verifyRes = await api("/me/wallet/deposit/verify", {
+                method: "POST",
+                token,
+                body: {
+                  amount: Number(amount),
+                  orderId: response.razorpay_order_id || orderRes.orderId,
+                  paymentId: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                  method: "Razorpay Official Gateway"
+                },
+              });
+              setReceipt(verifyRes);
+              refreshWallet();
+            } catch (err) {
+              setError(err.message || "Payment verification failed.");
+            } finally {
+              setBusy(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setBusy(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (response) {
+          setError(response.error?.description || "Payment failed or cancelled.");
+          setBusy(false);
+        });
+        rzp.open();
+        return;
+      }
+
+      // Fast test/demo recharge fallback
       const verifyRes = await api("/me/wallet/deposit/verify", {
         method: "POST",
         token,
         body: {
+          amount: Number(amount),
           orderId: orderRes.orderId,
           paymentId: `pay_demo_${Date.now()}`,
           signature: "demo_sig_verified",
+          method: "Instant Wallet Recharge (UPI/Demo)"
         },
       });
 

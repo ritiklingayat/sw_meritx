@@ -1081,6 +1081,49 @@ export default function Exam() {
             </div>
           )}
 
+          {/* Merit Reward Awarded Banner */}
+          {result?.reward && (
+            <div style={{
+              marginBottom: 24,
+              padding: "16px 20px",
+              borderRadius: 12,
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.2))",
+              border: "1.5px solid #10b981",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  background: "#10b981",
+                  color: "#ffffff",
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}>
+                  <Trophy size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: "#065f46" }}>
+                    🎉 Merit Prize Reward Credited: ₹{result.reward.amount}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#047857", marginTop: 2 }}>
+                    {result.reward.message}. Deposited into your student wallet. You can withdraw directly to UPI!
+                  </div>
+                </div>
+              </div>
+              <Link to="/student/withdraw" className="btn btn-primary small" style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <Wallet size={15} /> Withdraw Money <ArrowRight size={14} />
+              </Link>
+            </div>
+          )}
+
           {/* Metric Cards */}
           <div className="results-stats-grid">
             <div className="result-metric-card primary">

@@ -5,6 +5,7 @@ import { SiteHeader, SiteFooter, Loading } from '../../components/Layouts';
 import { api, money, friendlyDate } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { getExamScheduleInfo, formatDateTime, formatExamWindow } from '../../services/schedulingService';
+import { AddMoneyModal } from '../student/Student';
 
 export default function ExamDetails() {
   const { id } = useParams();
@@ -18,6 +19,16 @@ export default function ExamDetails() {
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [showTopUp, setShowTopUp] = useState(false);
+
+  const handleMoneyAdded = (newBal) => {
+    setWallet((prev) => ({
+      ...(prev || {}),
+      availableBalance: newBal,
+      balance: newBal
+    }));
+    setError('');
+  };
 
   const loadExamData = () => {
     setLoading(true);
@@ -208,9 +219,21 @@ export default function ExamDetails() {
               {user && wallet && (
                 <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, margin: '14px 0', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#64748b' }}>Your Wallet Balance:</span>
-                  <strong style={{ color: wallet.availableBalance >= (exam.fee || 0) ? '#10b981' : '#ef4444' }}>
-                    {money(wallet.availableBalance)}
-                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <strong style={{ color: (wallet.availableBalance ?? 0) >= (exam.fee || 0) ? '#10b981' : '#ef4444' }}>
+                      {money(wallet.availableBalance)}
+                    </strong>
+                    {(wallet.availableBalance ?? 0) < (exam.fee || 0) && (
+                      <button
+                        type="button"
+                        className="btn btn-primary small"
+                        style={{ padding: '3px 8px', fontSize: 11 }}
+                        onClick={() => setShowTopUp(true)}
+                      >
+                        + Add Money
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -229,9 +252,14 @@ export default function ExamDetails() {
                       {error}
                       {error.includes('Insufficient') && (
                         <div style={{ marginTop: 8 }}>
-                          <Link to="/student/wallet" className="btn btn-outline small" style={{ width: '100%', textAlign: 'center' }}>
-                            <Wallet size={14} /> Go to Wallet & Add Money
-                          </Link>
+                          <button
+                            type="button"
+                            className="btn btn-primary small"
+                            style={{ width: '100%' }}
+                            onClick={() => setShowTopUp(true)}
+                          >
+                            <Wallet size={14} /> Recharge Wallet Now via Razorpay / UPI
+                          </button>
                         </div>
                       )}
                     </div>
@@ -253,6 +281,15 @@ export default function ExamDetails() {
                         ? `Registration Opens on ${formatDate(schedule.registrationOpensAt)}`
                         : 'Registration Closed'}
                     </button>
+                  ) : exam.fee > 0 && (wallet?.availableBalance ?? 0) < exam.fee ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ width: '100%', borderColor: '#f59e0b', color: '#b45309' }}
+                      onClick={() => setShowTopUp(true)}
+                    >
+                      <Wallet size={16} /> Add {money(exam.fee - (wallet?.availableBalance ?? 0))} to Wallet to Enroll
+                    </button>
                   ) : (
                     <button
                       disabled={!accepted || busy}
@@ -260,7 +297,7 @@ export default function ExamDetails() {
                       style={{ width: '100%' }}
                       onClick={enroll}
                     >
-                      {busy ? 'Processing Wallet Payment…' : exam.fee > 0 ? `Register Now (${money(exam.fee)})` : 'Register for Exam (Free)'} <ArrowRight size={16} />
+                      {busy ? 'Processing Wallet Payment…' : exam.fee > 0 ? `Pay ${money(exam.fee)} from Wallet & Register` : 'Register for Exam (Free)'} <ArrowRight size={16} />
                     </button>
                   )}
                 </>
@@ -272,6 +309,15 @@ export default function ExamDetails() {
           )}
         </div>
       </div>
+
+      {showTopUp && (
+        <AddMoneyModal
+          isOpen={showTopUp}
+          onClose={() => setShowTopUp(false)}
+          currentBalance={wallet?.availableBalance ?? 0}
+          onMoneyAdded={handleMoneyAdded}
+        />
+      )}
       <SiteFooter />
     </>
   );

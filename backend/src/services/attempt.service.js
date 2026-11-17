@@ -214,13 +214,94 @@ export class AttemptService {
         }
       });
 
-      return { attempt: savedAttempt, result: savedResult };
+      // Merit reward calculation & wallet credit
+      let rewardEarned = 0;
+      let rewardMessage = '';
+
+      const passing = attempt.exam?.passingMarks || 40;
+      const score = finalResult.score || 0;
+      const maxMarks = finalResult.maximumMarks || 100;
+      const percentage = finalResult.percentage || (maxMarks > 0 ? (score / maxMarks) * 100 : 0);
+
+      if (score >= passing) {
+        if (percentage >= 90) {
+          rewardEarned = 500;
+          rewardMessage = 'Top Merit Award (90%+)';
+        } else if (percentage >= 75) {
+          rewardEarned = 250;
+          rewardMessage = 'Distinction Merit Award (75%+)';
+        } else {
+          rewardEarned = 100;
+          rewardMessage = 'Qualification Passing Reward';
+        }
+      }
+
+      let walletTx = null;
+      if (rewardEarned > 0) {
+        const rewardPaise = BigInt(rewardEarned * 100);
+        let userWallet = await tx.wallet.findUnique({ where: { userId: attempt.studentId } });
+        if (!userWallet) {
+          userWallet = await tx.wallet.create({
+            data: { userId: attempt.studentId, balancePaise: BigInt(0), currency: 'INR' }
+          });
+        }
+
+        const balBefore = userWallet.balancePaise;
+        const balAfter = balBefore + rewardPaise;
+
+        await tx.wallet.update({
+          where: { id: userWallet.id },
+          data: { balancePaise: balAfter }
+        });
+
+        const rewardRef = `REW-${Date.now()}-${attemptId.slice(-4)}`;
+        walletTx = await tx.walletTransaction.create({
+          data: {
+            walletId: userWallet.id,
+            userId: attempt.studentId,
+            type: 'reward',
+            direction: 'credit',
+            amountPaise: rewardPaise,
+            balanceBeforePaise: balBefore,
+            balanceAfterPaise: balAfter,
+            status: 'successful',
+            referenceId: rewardRef,
+            description: `Merit Reward: ${attempt.exam?.title || 'Mock Exam'} (${rewardMessage})`
+          }
+        });
+
+        await tx.walletLedgerEntry.create({
+          data: {
+            walletId: userWallet.id,
+            transactionKey: `LEDGER-${rewardRef}`,
+            entryType: 'CREDIT',
+            category: 'PRIZE_REWARD',
+            amountPaise: rewardPaise,
+            balanceAfterPaise: balAfter,
+            memo: `Merit Reward: ₹${rewardEarned} for ${attempt.exam?.title || 'Mock Exam'}`
+          }
+        });
+      }
+
+      return {
+        attempt: savedAttempt,
+        result: savedResult,
+        reward: rewardEarned > 0 ? {
+          amount: rewardEarned,
+          message: rewardMessage,
+          transactionId: walletTx?.id
+        } : null
+      };
     });
 
     return {
       success: true,
       attempt: updated.attempt,
-      result: finalResult
+      result: {
+        ...finalResult,
+        reward: updated.reward
+      },
+      reward: updated.reward
     };
   }
 
@@ -279,13 +360,94 @@ export class AttemptService {
         }
       });
 
-      return { attempt: savedAttempt, result: savedResult };
+      // Merit reward calculation & wallet credit
+      let rewardEarned = 0;
+      let rewardMessage = '';
+
+      const passing = attempt.exam?.passingMarks || 40;
+      const score = finalResult.score || 0;
+      const maxMarks = finalResult.maximumMarks || 100;
+      const percentage = finalResult.percentage || (maxMarks > 0 ? (score / maxMarks) * 100 : 0);
+
+      if (score >= passing) {
+        if (percentage >= 90) {
+          rewardEarned = 500;
+          rewardMessage = 'Top Merit Award (90%+)';
+        } else if (percentage >= 75) {
+          rewardEarned = 250;
+          rewardMessage = 'Distinction Merit Award (75%+)';
+        } else {
+          rewardEarned = 100;
+          rewardMessage = 'Qualification Passing Reward';
+        }
+      }
+
+      let walletTx = null;
+      if (rewardEarned > 0) {
+        const rewardPaise = BigInt(rewardEarned * 100);
+        let userWallet = await tx.wallet.findUnique({ where: { userId: attempt.studentId } });
+        if (!userWallet) {
+          userWallet = await tx.wallet.create({
+            data: { userId: attempt.studentId, balancePaise: BigInt(0), currency: 'INR' }
+          });
+        }
+
+        const balBefore = userWallet.balancePaise;
+        const balAfter = balBefore + rewardPaise;
+
+        await tx.wallet.update({
+          where: { id: userWallet.id },
+          data: { balancePaise: balAfter }
+        });
+
+        const rewardRef = `REW-${Date.now()}-${attemptId.slice(-4)}`;
+        walletTx = await tx.walletTransaction.create({
+          data: {
+            walletId: userWallet.id,
+            userId: attempt.studentId,
+            type: 'reward',
+            direction: 'credit',
+            amountPaise: rewardPaise,
+            balanceBeforePaise: balBefore,
+            balanceAfterPaise: balAfter,
+            status: 'successful',
+            referenceId: rewardRef,
+            description: `Merit Reward: ${attempt.exam?.title || 'Mock Exam'} (${rewardMessage})`
+          }
+        });
+
+        await tx.walletLedgerEntry.create({
+          data: {
+            walletId: userWallet.id,
+            transactionKey: `LEDGER-${rewardRef}`,
+            entryType: 'CREDIT',
+            category: 'PRIZE_REWARD',
+            amountPaise: rewardPaise,
+            balanceAfterPaise: balAfter,
+            memo: `Merit Reward: ₹${rewardEarned} for ${attempt.exam?.title || 'Mock Exam'}`
+          }
+        });
+      }
+
+      return {
+        attempt: savedAttempt,
+        result: savedResult,
+        reward: rewardEarned > 0 ? {
+          amount: rewardEarned,
+          message: rewardMessage,
+          transactionId: walletTx?.id
+        } : null
+      };
     });
 
     return {
       success: true,
       attempt: updated.attempt,
-      result: finalResult
+      result: {
+        ...finalResult,
+        reward: updated.reward
+      },
+      reward: updated.reward
     };
   }
 }
