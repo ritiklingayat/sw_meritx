@@ -35,8 +35,13 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests or matching origins
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+    // Allow non-browser requests, matching origins, localhost, or any vercel.app deployment
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      origin.startsWith('http://localhost:') ||
+      origin.endsWith('.vercel.app')
+    ) {
       callback(null, true);
     } else {
       callback(null, true); // Permissive in dev, configurable in prod

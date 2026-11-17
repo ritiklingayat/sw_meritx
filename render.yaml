@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: meritx-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: ENABLE_REAL_MONEY
+        value: "false"
+      - key: ENABLE_REAL_WITHDRAWALS
+        value: "false"
+      - key: ENABLE_PAID_ENTRY
+        value: "false"
+      - key: ENABLE_CASH_PRIZES
+        value: "false"
+      - key: SEED_DEMO_USERS
+        value: "true"
