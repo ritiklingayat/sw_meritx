@@ -4,7 +4,7 @@ import { CalendarDays, Clock3, Users, Trophy, Check, ArrowLeft, ArrowRight, Shie
 import { SiteHeader, SiteFooter, Loading } from '../../components/Layouts';
 import { api, money, friendlyDate } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { getExamScheduleInfo, formatDateTime, formatExamWindow } from '../../services/schedulingService';
+import { getExamScheduleInfo, formatDateTime, formatDate, formatTime, formatExamWindow } from '../../services/schedulingService';
 import { AddMoneyModal } from '../student/Student';
 
 export default function ExamDetails() {

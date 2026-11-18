@@ -1,8 +1,24 @@
 import { AppError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
+import { isTransientConnectionError } from '../config/prisma.js';
 
 export function errorHandler(err, req, res, next) {
+  // Handle transient PostgreSQL/Neon connection drops gracefully
+  if (!(err instanceof AppError) && isTransientConnectionError(err)) {
+    logger.warn('Transient Database Connection Error:', {
+      code: err.code,
+      error: err.message,
+      path: req.originalUrl,
+      method: req.method
+    });
+    return res.status(503).json({
+      success: false,
+      error: 'DATABASE_UNAVAILABLE',
+      message: 'Database is waking up or reconnecting. Please retry in a moment.'
+    });
+  }
+
   // Log unexpected errors
   if (!(err instanceof AppError)) {
     logger.error('Unhandled Server Error:', {

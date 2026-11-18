@@ -27,6 +27,9 @@ import {
   Filter,
   Trophy,
   Timer,
+  BookOpen,
+  BarChart3,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
