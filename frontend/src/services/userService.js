@@ -57,7 +57,7 @@ class UserService {
     const wallets = storageService.getCollection(STORAGE_KEYS.WALLETS);
     const userWallet = wallets.find((w) => w.studentId === studentId) || {
       studentId,
-      balance: 1500,
+      balance: 0,
       currency: 'INR'
     };
 

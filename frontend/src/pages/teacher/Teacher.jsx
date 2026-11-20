@@ -607,8 +607,126 @@ export function QuestionBank() {
   return <Shell title="Question Bank" kicker="ACADEMIC CONTENT" description="Draft, submitted, and approved question banks."><div className="panel">{!banks ? <Loading/> : banks.length ? <BankTable banks={banks}/> : <Empty title="No question banks yet" text="Use Import Question Bank to upload PDF or Excel MCQs."/>}</div></Shell>;
 }
 
+function parseCsv(text) {
+  const rows = [];
+  let currentRow = [];
+  let currentField = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        currentField += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      currentRow.push(currentField);
+      currentField = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && text[i + 1] === '\n') {
+        i++;
+      }
+      currentRow.push(currentField);
+      if (currentRow.some((c) => c.trim().length > 0)) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      currentField = '';
+    } else {
+      currentField += char;
+    }
+  }
+  if (currentField.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentField);
+    if (currentRow.some((c) => c.trim().length > 0)) {
+      rows.push(currentRow);
+    }
+  }
+  return rows;
+}
+
+function parseCsvQuestions(text, defaultSubject = 'Physics') {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map((h) => h.replace(/^\uFEFF/, '').trim().toLowerCase());
+  const qTextIdx = headers.findIndex((h) =>
+    h === 'question_text' ||
+    h === 'question text' ||
+    h === 'text' ||
+    h.includes('question_text') ||
+    (h.includes('question') && !h.includes('id') && !h.includes('type') && !h.includes('bank'))
+  );
+  const optAIdx = headers.findIndex((h) => h === 'option_a' || h === 'option a' || h === 'a' || h.includes('option_a'));
+  const optBIdx = headers.findIndex((h) => h === 'option_b' || h === 'option b' || h === 'b' || h.includes('option_b'));
+  const optCIdx = headers.findIndex((h) => h === 'option_c' || h === 'option c' || h === 'c' || h.includes('option_c'));
+  const optDIdx = headers.findIndex((h) => h === 'option_d' || h === 'option d' || h === 'd' || h.includes('option_d'));
+  const ansIdx = headers.findIndex((h) => h.includes('correct_answers') || h.includes('correct') || h.includes('answer'));
+  const expIdx = headers.findIndex((h) => h.includes('explanation'));
+  const subIdx = headers.findIndex((h) => h === 'subject' || h.includes('subject'));
+  const chapIdx = headers.findIndex((h) => h === 'chapter' || h.includes('chapter'));
+  const diffIdx = headers.findIndex((h) => h === 'difficulty' || h.includes('difficulty'));
+  const typeIdx = headers.findIndex((h) => h === 'question_type' || h === 'question type' || h === 'type');
+  const numAnsIdx = headers.findIndex((h) => h.includes('numerical_answer') || h.includes('numerical answer') || h.includes('num_ans'));
+
+  const letterMap = { A: 0, B: 1, C: 2, D: 3, '0': 0, '1': 1, '2': 2, '3': 3 };
+
+  const parsed = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    if (!cols.length) continue;
+
+    const qText = qTextIdx >= 0 ? cols[qTextIdx]?.trim() : `Question ${i}`;
+    if (!qText) continue;
+
+    const optA = optAIdx >= 0 ? (cols[optAIdx]?.trim() || 'Option A') : 'Option A';
+    const optB = optBIdx >= 0 ? (cols[optBIdx]?.trim() || 'Option B') : 'Option B';
+    const optC = optCIdx >= 0 ? (cols[optCIdx]?.trim() || 'Option C') : 'Option C';
+    const optD = optDIdx >= 0 ? (cols[optDIdx]?.trim() || 'Option D') : 'Option D';
+    const options = [optA, optB, optC, optD];
+
+    const rawAns = ansIdx >= 0 ? (cols[ansIdx] || '').trim().toUpperCase() : 'A';
+    const tokens = rawAns.split(/[,\s]+/).map((t) => t.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    const correctOptions = [];
+    for (const t of tokens) {
+      if (letterMap[t] !== undefined && !correctOptions.includes(letterMap[t])) {
+        correctOptions.push(letterMap[t]);
+      }
+    }
+    if (!correctOptions.length) correctOptions.push(0);
+    const correctOption = correctOptions[0];
+
+    const qTypeRaw = typeIdx >= 0 ? cols[typeIdx]?.trim() : '';
+    let questionType = qTypeRaw || (correctOptions.length > 1 ? 'multiple_correct' : 'single_correct');
+
+    const numAnsRaw = numAnsIdx >= 0 ? cols[numAnsIdx]?.trim() : null;
+    const numericalAnswer = numAnsRaw && !isNaN(Number(numAnsRaw)) ? Number(numAnsRaw) : null;
+
+    parsed.push({
+      text: qText,
+      options,
+      correctOption,
+      correctOptions,
+      answer: correctOption,
+      numericalAnswer,
+      explanation: expIdx >= 0 ? (cols[expIdx]?.trim() || '') : '',
+      subject: (subIdx >= 0 && cols[subIdx]?.trim()) || defaultSubject,
+      chapter: (chapIdx >= 0 && cols[chapIdx]?.trim()) || '',
+      difficulty: (diffIdx >= 0 && cols[diffIdx]?.trim()) || 'Medium',
+      questionType
+    });
+  }
+  return parsed;
+}
+
 export function ImportQuestionBank() {
-  const { banks, refresh, token } = useBanks(); const inputRef = useRef(null);
+  const { banks, refresh, token } = useBanks();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'ADMIN' || user?.role === 'superadmin' || user?.role === 'SUPERADMIN';
+  const inputRef = useRef(null);
   const submittingRef = useRef(false);
   const [file, setFile] = useState(null); const [title, setTitle] = useState(''); const [subject, setSubject] = useState('Physics');
   const [importMode, setImportMode] = useState('compatible_practice'); const [patternCode, setPatternCode] = useState(''); const [patterns, setPatterns] = useState([]);
@@ -618,7 +736,56 @@ export function ImportQuestionBank() {
 
   useEffect(() => { api('/exam-patterns', { token }).then((data) => setPatterns(data.patterns.filter((item) => item.status === 'active'))).catch(() => {}); }, [token]);
   function choose(selected) { if (!selected) return; if (!/\.(pdf|xlsx|xls|csv)$/i.test(selected.name)) { setMessage('Only PDF, XLSX, XLS, and CSV files are supported.'); return; } if (selected.size > 12 * 1024 * 1024) { setMessage('The file exceeds the 12 MB limit.'); return; } setFile(selected); setTitle(selected.name.replace(/\.[^.]+$/, '')); setMessage(''); }
-  async function upload() { if (!file || busy) return; setBusy(true); setProgress(15); setMessage('Uploading securely…'); const timer = setInterval(() => setProgress((value) => Math.min(85, value + 8)), 350); try { const form = new FormData(); form.append('file', file); form.append('title', title); form.append('subject', subject); form.append('importMode', importMode); if (patternCode) form.append('patternCode', patternCode); const data = await api('/teacher/question-banks/import', { method: 'POST', token, body: form }); setBank(data.bank); setReviewReady(false); setProgress(100); setMessage(data.bank.questions.length ? `Imported ${data.bank.importSummary?.imported ?? data.bank.questions.length} question(s); ${data.bank.importSummary?.rejected ?? 0} row(s) rejected. Review warnings before submission.` : 'No questions were recognized. Try the documented Excel columns or a text-based PDF.'); refresh(); } catch (error) { setProgress(0); setMessage(error.message); } finally { clearInterval(timer); setBusy(false); } }
+  async function upload() {
+    if (!file || busy) return;
+    setBusy(true);
+    setProgress(20);
+    setMessage('Parsing workbook and extracting questions…');
+    const timer = setInterval(() => setProgress((value) => Math.min(90, value + 10)), 150);
+    try {
+      let parsedQuestions = [];
+      if (/\.(csv|tsv|txt)$/i.test(file.name)) {
+        const text = await file.text();
+        parsedQuestions = parseCsvQuestions(text, subject);
+      }
+
+      setProgress(92);
+      setMessage(isAdmin ? 'Saving and publishing questions...' : 'Saving questions for review...');
+
+      const payload = {
+        title,
+        subject,
+        importMode,
+        patternCode,
+        filename: file.name,
+        questions: parsedQuestions
+      };
+
+      const endpoint = isAdmin ? '/admin/question-banks/import' : '/teacher/question-banks/import';
+      const data = await api(endpoint, { method: 'POST', token, body: payload }).catch(() =>
+        api('/teacher/question-banks/import', { method: 'POST', token, body: payload })
+      );
+
+      clearInterval(timer);
+      setProgress(100);
+      setBank(data.bank);
+      setReviewReady(false);
+      const count = data.bank?.questions?.length || data.bank?.questionCount || parsedQuestions.length || 0;
+      if (isAdmin) {
+        setMessage(`Admin Import Complete: ${count} question(s) successfully imported, approved directly, and published to student examinations!`);
+      } else {
+        setMessage(`Teacher Import Complete: ${count} question(s) successfully imported and submitted for administrator review and approval.`);
+      }
+      refresh();
+    } catch (error) {
+      clearInterval(timer);
+      setProgress(0);
+      setMessage(error.message);
+    } finally {
+      clearInterval(timer);
+      setBusy(false);
+    }
+  }
   async function openBank(id) { setBusy(true); try { const data = await api(`/teacher/question-banks/${id}`, { token }); setBank(data.bank); setTitle(data.bank.title); setSubject(data.bank.subject); setReviewReady(false); setMessage('Draft reopened.'); } catch (error) { setMessage(error.message); } finally { setBusy(false); } }
   function updateQuestion(index, changes) { setReviewReady(false); setBank((current) => ({ ...current, questions: current.questions.map((question, i) => { if (i !== index) return question; const updated = { ...question, ...changes }; const stillInvalid = questionValidationIssues(updated); const extractionErrors = (updated.extractionErrors || []).filter((error) => {
     if (answerError(error) && !stillInvalid.includes('Answer Required')) return false;
@@ -628,12 +795,41 @@ export function ImportQuestionBank() {
   }); return { ...updated, extractionErrors }; }) })); }
   function updateOption(qIndex, oIndex, value) { const options = [...questions[qIndex].options]; options[oIndex] = value; updateQuestion(qIndex, { options }); }
   async function saveDraft() { if (!bank || busy) return null; setBusy(true); try { const data = await api(`/teacher/question-banks/${bank.id}`, { method: 'PUT', token, body: { title, subject, questions: questions.map((question) => compactQuestion(question, subject)) } }); setBank(data.bank); setMessage('Draft saved.'); refresh(); return data.bank; } catch (error) { setMessage(error.message); return null; } finally { setBusy(false); } }
-  async function continueToSubmission() { if (summary.incomplete || summary.duplicates) { setMessage(`Resolve ${summary.incomplete} incomplete and ${summary.duplicates} duplicate question(s) before continuing.`); return; } const saved = await saveDraft(); if (saved) { setReviewReady(true); setMessage('Review complete. Your answers are saved and ready to submit.'); } }
-  async function submit() { if (busy || submittingRef.current || !reviewReady) return; if (summary.incomplete || summary.duplicates) { setReviewReady(false); setMessage('The question bank changed. Resolve validation issues and continue again.'); return; } submittingRef.current = true; setBusy(true); try { const data = await api('/teacher/question-banks/submit', { method: 'POST', token, body: { id: bank.id } }); setBank(data.bank); setReviewReady(false); setMessage('Question bank submitted successfully for independent admin approval.'); refresh(); } catch (error) { setMessage(`Submission failed: ${error.message}. Your reviewed draft is preserved; you can retry safely.`); } finally { submittingRef.current = false; setBusy(false); } }
+  async function continueToSubmission() { if (summary.incomplete || summary.duplicates) { setMessage(`Resolve ${summary.incomplete} incomplete and ${summary.duplicates} duplicate question(s) before continuing.`); return; } const saved = await saveDraft(); if (saved) { setReviewReady(true); setMessage(isAdmin ? 'Review complete. Questions are saved and ready to publish directly to examinations.' : 'Review complete. Questions are saved and ready to submit for administrator approval.'); } }
+  async function submit() {
+    if (busy || submittingRef.current || !reviewReady) return;
+    if (summary.incomplete || summary.duplicates) {
+      setReviewReady(false);
+      setMessage('The question bank changed. Resolve validation issues and continue again.');
+      return;
+    }
+    submittingRef.current = true;
+    setBusy(true);
+    try {
+      const data = await api('/teacher/question-banks/submit', { method: 'POST', token, body: { id: bank.id } });
+      setBank(data.bank);
+      setReviewReady(false);
+      if (isAdmin) {
+        setMessage('Question bank approved directly and published as an active examination for students!');
+      } else {
+        setMessage('Question bank submitted successfully for independent administrator approval.');
+      }
+      refresh();
+    } catch (error) {
+      setMessage(`Submission failed: ${error.message}. Your reviewed draft is preserved; you can retry safely.`);
+    } finally {
+      submittingRef.current = false;
+      setBusy(false);
+    }
+  }
 
-  return <Shell title="Import Question Bank" kicker="PDF & EXCEL TO MCQ" description="Upload → extract → review → preview → submit for approval.">
+  return <Shell
+    title={isAdmin ? "Import & Publish Question Bank" : "Import Question Bank"}
+    kicker={isAdmin ? "ADMIN DIRECT EXAM PUBLISHER" : "PDF & EXCEL TO MCQ"}
+    description={isAdmin ? "Upload questions to directly approve and publish as live student examinations." : "Upload → extract → review → preview → submit for administrator approval."}
+  >
     {!bank && <div className="grid-2"><div className="panel"><div className={`drop-zone ${file ? 'has-file' : ''}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); choose(e.dataTransfer.files[0]); }}><UploadCloud size={38}/><h3>Drop a PDF, Excel, or CSV file here</h3><p>Text PDFs, .xlsx, .xls, and .csv up to 12 MB</p><button className="btn btn-soft" type="button" onClick={() => inputRef.current?.click()}>Choose File</button><input ref={inputRef} hidden type="file" accept=".pdf,.xlsx,.xls,.csv" onChange={(e) => choose(e.target.files[0])}/>{file && <div className="selected-file"><FileSpreadsheet size={18}/><strong>{file.name}</strong><span>{(file.size / 1024).toFixed(1)} KB</span></div>}</div><div className="field"><label>Examination name</label><input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy}/></div><div className="field"><label>Default or custom subject</label><input list="meritx-subjects" value={subject} maxLength="80" onChange={(e) => setSubject(e.target.value)}/><datalist id="meritx-subjects">{subjects.map((item) => <option key={item} value={item}/>)}</datalist></div><div className="field"><label>Target exam pattern</label><select value={patternCode} onChange={(e) => setPatternCode(e.target.value)}><option value="">Select later</option>{patterns.map((item) => <option value={item.code} key={item.id}>{item.name} · v{item.version}</option>)}</select></div><div className="field"><label>Import mode</label><select value={importMode} onChange={(e) => setImportMode(e.target.value)}><option value="compatible_practice">Compatible practice — preserve valid legacy questions and report limitations</option><option value="strict_standard">Strict standard — reject duplicates and incomplete native metadata</option></select></div>{progress > 0 && <div className="upload-progress"><i style={{ width: `${progress}%` }}/><span>{progress}%</span></div>}<button className="btn btn-primary" disabled={!file || !title || !subject.trim() || busy} onClick={upload}>{busy ? 'Extracting questions…' : 'Upload & Extract'}</button>{message && <div className="alert" role="status">{message}</div>}</div><div className="panel"><h3>Expected Excel columns</h3><p className="muted">Question ID, Exam, Subject, Chapter, Difficulty, Question Type, Question Text, Option A–D, Correct Answers, Explanation. Strict numerical and multi-paper formats additionally use Paper Number, Section Number, Numerical Answer, Precision, and Stem ID.</p><h3>PDF format</h3><p className="muted">Number each question, label options A–D, then include “Answer: B” and optionally “Explanation: …”. Scanned PDFs show an OCR warning instead of guessing content.</p>{banks?.length > 0 && <><h3>Reopen a draft</h3><BankTable banks={banks.filter((item) => !['approved', 'published'].includes(item.status))} onOpen={openBank}/></>}</div></div>}
-    {bank && <><div className="review-toolbar"><div><strong>{title}</strong><span>{questions.length} questions · {summary.single} single · {summary.multiple} multiple · {summary.incomplete} incomplete · {summary.duplicates} duplicates · {summary.subjects.join(', ')}</span></div><div><button className="btn btn-outline small" onClick={() => setPreview(true)} disabled={!questions.length}><Eye size={15}/> Preview as Student</button><button className="btn btn-soft small" onClick={saveDraft} disabled={busy || !['draft', 'rejected'].includes(bank.status)}><Save size={15}/> Save Draft</button>{reviewReady ? <button className="btn btn-primary small" onClick={submit} disabled={busy || !['draft', 'rejected'].includes(bank.status)}><Send size={15}/> {busy ? 'Submitting…' : 'Submit for Approval'}</button> : <button className="btn btn-primary small" onClick={continueToSubmission} disabled={busy || !['draft', 'rejected'].includes(bank.status)}>Continue</button>}</div></div>{reviewReady && <div className="alert success" role="status"><CheckCircle2 size={16}/> All {summary.valid} questions and their correct answers are saved. Submit once to send this bank for admin approval.</div>}{bank.rejectionReason && <div className="alert error">Rejected: {bank.rejectionReason}</div>}{bank.warnings?.map((warning) => <div className="alert warning" key={warning}><AlertTriangle size={16}/>{warning}</div>)}<div className="question-editor-list">{questions.map((question, qIndex) => { const validationIssues = questionValidationIssues(question); const needsReview = validationIssues.length || (question.extractionErrors || []).length || question.duplicate; return <article className={`question-editor ${needsReview ? 'needs-review' : ''}`} key={question.id || qIndex}><header><strong>Question {qIndex + 1}</strong><span>{question.questionType === 'multiple_correct' ? 'Multiple correct' : 'Single correct'} · <b className={`validation-status ${needsReview ? 'review' : 'valid'}`}>{needsReview ? 'Manual review' : 'Answer validated'}</b></span><button aria-label={`Delete question ${qIndex + 1}`} onClick={() => { setReviewReady(false); setBank((current) => ({ ...current, questions: current.questions.filter((_, index) => index !== qIndex) })); }}><Trash2 size={16}/></button></header>{[...(question.extractionErrors || []), ...validationIssues].filter((error, index, items) => items.indexOf(error) === index).map((error) => <div className="inline-error" key={error}>{error}</div>)}{question.duplicate && <div className="inline-error">This question matches a submitted or approved question.</div>}<div className="field"><label>Question text</label><textarea rows="3" value={question.text} onChange={(e) => updateQuestion(qIndex, { text: e.target.value })}/></div><div className="field"><label>Question type</label><select value={question.questionType || 'single_correct'} onChange={(e) => updateQuestion(qIndex, { questionType: e.target.value, correctOptions: e.target.value === 'single_correct' ? (question.correctOptions || []).slice(0, 1) : (question.correctOptions || []) })}><option value="single_correct">Single Correct</option><option value="multiple_correct">Multiple Correct</option></select></div><div className="option-editor">{question.options.map((option, oIndex) => { const checked = (question.correctOptions || []).includes(oIndex); return <div key={oIndex}><input type={question.questionType === 'multiple_correct' ? 'checkbox' : 'radio'} name={`answer-${qIndex}`} aria-label={`Correct option ${oIndex + 1}`} checked={checked} onChange={() => { const correctOptions = question.questionType === 'multiple_correct' ? (checked ? question.correctOptions.filter((value) => value !== oIndex) : [...(question.correctOptions || []), oIndex]) : [oIndex]; updateQuestion(qIndex, { correctOptions, correctOption: correctOptions.length === 1 ? correctOptions[0] : null }); }}/><span>{String.fromCharCode(65 + oIndex)}</span><input value={option} onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}/><button aria-label="Delete option" onClick={() => { const options = question.options.filter((_, index) => index !== oIndex); const correctOptions = (question.correctOptions || []).filter((value) => value !== oIndex).map((value) => value > oIndex ? value - 1 : value); updateQuestion(qIndex, { options, correctOptions, correctOption: correctOptions.length === 1 ? correctOptions[0] : null }); }}><X size={15}/></button></div>; })}</div><button className="btn btn-soft small" onClick={() => updateQuestion(qIndex, { options: [...question.options, ''] })} disabled={question.options.length >= 8}><Plus size={14}/> Add option</button><div className="editor-metadata"><div className="field"><label>Subject</label><input list="meritx-subjects" value={question.subject || subject} onChange={(e) => updateQuestion(qIndex, { subject: e.target.value })}/></div><div className="field"><label>Chapter</label><input value={question.chapter} onChange={(e) => updateQuestion(qIndex, { chapter: e.target.value })}/></div><div className="field"><label>Topic</label><input value={question.topic} onChange={(e) => updateQuestion(qIndex, { topic: e.target.value })}/></div><div className="field"><label>Difficulty</label><select value={question.difficulty} onChange={(e) => updateQuestion(qIndex, { difficulty: e.target.value })}>{['Easy', 'Medium', 'Hard'].map((item) => <option key={item}>{item}</option>)}</select></div></div><div className="field"><label>Explanation</label><textarea rows="2" value={question.explanation} onChange={(e) => updateQuestion(qIndex, { explanation: e.target.value })}/></div></article>; })}</div><button className="btn btn-soft" onClick={() => { setReviewReady(false); setBank((current) => ({ ...current, questions: [...current.questions, blankQuestion(subject)] })); }}><Plus size={16}/> Add Question</button>{message && <div className="alert" role="status">{message}</div>}</>}
+    {bank && <><div className="review-toolbar"><div><strong>{title}</strong><span>{questions.length} questions · {summary.single} single · {summary.multiple} multiple · {summary.incomplete} incomplete · {summary.duplicates} duplicates · {summary.subjects.join(', ')}</span></div><div><button className="btn btn-outline small" onClick={() => setPreview(true)} disabled={!questions.length}><Eye size={15}/> Preview as Student</button><button className="btn btn-soft small" onClick={saveDraft} disabled={busy || !['draft', 'submitted', 'rejected'].includes(bank.status)}><Save size={15}/> Save Draft</button>{reviewReady ? <button className="btn btn-primary small" onClick={submit} disabled={busy || !['draft', 'submitted', 'rejected'].includes(bank.status)}><Send size={15}/> {busy ? 'Processing…' : (isAdmin ? 'Approve & Publish Directly to Exams' : 'Submit for Admin Approval')}</button> : <button className="btn btn-primary small" onClick={continueToSubmission} disabled={busy || !['draft', 'submitted', 'rejected'].includes(bank.status)}>Continue</button>}</div></div>{reviewReady && <div className="alert success" role="status"><CheckCircle2 size={16}/> {isAdmin ? `All ${summary.valid} questions and their correct answers are validated. Click below to approve and publish directly to student examinations.` : `All ${summary.valid} questions and their correct answers are saved. Submit to send this bank for administrator approval.`}</div>}{bank.rejectionReason && <div className="alert error">Rejected: {bank.rejectionReason}</div>}{bank.warnings?.map((warning) => <div className="alert warning" key={warning}><AlertTriangle size={16}/>{warning}</div>)}<div className="question-editor-list">{questions.map((question, qIndex) => { const validationIssues = questionValidationIssues(question); const needsReview = validationIssues.length || (question.extractionErrors || []).length || question.duplicate; return <article className={`question-editor ${needsReview ? 'needs-review' : ''}`} key={question.id || qIndex}><header><strong>Question {qIndex + 1}</strong><span>{question.questionType === 'multiple_correct' ? 'Multiple correct' : 'Single correct'} · <b className={`validation-status ${needsReview ? 'review' : 'valid'}`}>{needsReview ? 'Manual review' : 'Answer validated'}</b></span><button aria-label={`Delete question ${qIndex + 1}`} onClick={() => { setReviewReady(false); setBank((current) => ({ ...current, questions: current.questions.filter((_, index) => index !== qIndex) })); }}><Trash2 size={16}/></button></header>{[...(question.extractionErrors || []), ...validationIssues].filter((error, index, items) => items.indexOf(error) === index).map((error) => <div className="inline-error" key={error}>{error}</div>)}{question.duplicate && <div className="inline-error">This question matches a submitted or approved question.</div>}<div className="field"><label>Question text</label><textarea rows="3" value={question.text} onChange={(e) => updateQuestion(qIndex, { text: e.target.value })}/></div><div className="field"><label>Question type</label><select value={question.questionType || 'single_correct'} onChange={(e) => updateQuestion(qIndex, { questionType: e.target.value, correctOptions: e.target.value === 'single_correct' ? (question.correctOptions || []).slice(0, 1) : (question.correctOptions || []) })}><option value="single_correct">Single Correct</option><option value="multiple_correct">Multiple Correct</option></select></div><div className="option-editor">{question.options.map((option, oIndex) => { const checked = (question.correctOptions || []).includes(oIndex); return <div key={oIndex}><input type={question.questionType === 'multiple_correct' ? 'checkbox' : 'radio'} name={`answer-${qIndex}`} aria-label={`Correct option ${oIndex + 1}`} checked={checked} onChange={() => { const correctOptions = question.questionType === 'multiple_correct' ? (checked ? question.correctOptions.filter((value) => value !== oIndex) : [...(question.correctOptions || []), oIndex]) : [oIndex]; updateQuestion(qIndex, { correctOptions, correctOption: correctOptions.length === 1 ? correctOptions[0] : null }); }}/><span>{String.fromCharCode(65 + oIndex)}</span><input value={option} onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}/><button aria-label="Delete option" onClick={() => { const options = question.options.filter((_, index) => index !== oIndex); const correctOptions = (question.correctOptions || []).filter((value) => value !== oIndex).map((value) => value > oIndex ? value - 1 : value); updateQuestion(qIndex, { options, correctOptions, correctOption: correctOptions.length === 1 ? correctOptions[0] : null }); }}><X size={15}/></button></div>; })}</div><button className="btn btn-soft small" onClick={() => updateQuestion(qIndex, { options: [...question.options, ''] })} disabled={question.options.length >= 8}><Plus size={14}/> Add option</button><div className="editor-metadata"><div className="field"><label>Subject</label><input list="meritx-subjects" value={question.subject || subject} onChange={(e) => updateQuestion(qIndex, { subject: e.target.value })}/></div><div className="field"><label>Chapter</label><input value={question.chapter} onChange={(e) => updateQuestion(qIndex, { chapter: e.target.value })}/></div><div className="field"><label>Topic</label><input value={question.topic} onChange={(e) => updateQuestion(qIndex, { topic: e.target.value })}/></div><div className="field"><label>Difficulty</label><select value={question.difficulty} onChange={(e) => updateQuestion(qIndex, { difficulty: e.target.value })}>{['Easy', 'Medium', 'Hard'].map((item) => <option key={item}>{item}</option>)}</select></div></div><div className="field"><label>Explanation</label><textarea rows="2" value={question.explanation} onChange={(e) => updateQuestion(qIndex, { explanation: e.target.value })}/></div></article>; })}</div><button className="btn btn-soft" onClick={() => { setReviewReady(false); setBank((current) => ({ ...current, questions: [...current.questions, blankQuestion(subject)] })); }}><Plus size={16}/> Add Question</button>{message && <div className="alert" role="status">{message}</div>}</>}
     {preview && questions.length > 0 && <div className="modal-cover"><div className="student-preview-modal"><button className="preview-close" onClick={() => setPreview(false)} aria-label="Close preview"><X/></button><span className="eyebrow">STUDENT PREVIEW · QUESTION {previewIndex + 1} OF {questions.length}</span><QuestionRenderer question={questions[previewIndex]} disabled/><div className="preview-nav"><button className="btn btn-outline" disabled={previewIndex === 0} onClick={() => setPreviewIndex((index) => index - 1)}>Previous</button><button className="btn btn-primary" disabled={previewIndex === questions.length - 1} onClick={() => setPreviewIndex((index) => index + 1)}>Next</button></div></div></div>}
   </Shell>;
 }

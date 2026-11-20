@@ -154,6 +154,17 @@ async function localFallbackRouter(path, { method = 'GET', body, token } = {}) {
     return { exam };
   }
 
+  const adminExamMatch = cleanPath.match(/^\/admin\/exams\/([^/]+)$/);
+  if (adminExamMatch && m === 'PUT') {
+    const updated = await examService.updateExam(adminExamMatch[1], body || {});
+    return { exam: updated, success: true };
+  }
+
+  if (cleanPath === '/admin/exams' && m === 'POST') {
+    const created = await examService.createExam(body || {});
+    return { exam: created, success: true };
+  }
+
   if (cleanPath === '/exams/register' && m === 'POST') {
     const { walletService } = await import('../services/walletService');
     const exam = await examService.getExamById(body?.examId);
@@ -221,22 +232,253 @@ async function localFallbackRouter(path, { method = 'GET', body, token } = {}) {
     return { success: true };
   }
 
+  if (cleanPath === '/admin/proctoring/overview' && m === 'GET') {
+    return adminService.getProctoringOverview();
+  }
+
+  if (cleanPath === '/admin/proctoring/candidates' && m === 'GET') {
+    const candidates = await adminService.getProctoringCandidates();
+    return { candidates };
+  }
+
+  const proctoringTimelineMatch = cleanPath.match(/^\/admin\/proctoring\/attempts\/([^/]+)\/timeline$/);
+  if (proctoringTimelineMatch && m === 'GET') {
+    return adminService.getProctoringTimeline(proctoringTimelineMatch[1]);
+  }
+
+  // Question Banks Local Fallback
+  if ((cleanPath === '/teacher/question-banks' || cleanPath === '/admin/question-banks') && m === 'GET') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    return { banks };
+  }
+
+  const qbMatch = cleanPath.match(/^\/teacher\/question-banks\/([^/]+)$/);
+  if (qbMatch && m === 'GET') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    const b = banks.find((item) => item.id === qbMatch[1]) || { id: qbMatch[1], title: 'Sample Bank', subject: 'Physics', questions: [] };
+    return { bank: b, questions: b.questions || [] };
+  }
+
+  if (qbMatch && m === 'PUT') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    const existing = banks.find((item) => item.id === qbMatch[1]);
+    const updated = {
+      ...(existing || {}),
+      ...(body || {}),
+      id: qbMatch[1],
+      questionCount: body?.questions?.length ?? existing?.questions?.length ?? 0
+    };
+    storageService.saveCollection('meritx_question_banks', [
+      ...banks.filter((item) => item.id !== qbMatch[1]),
+      updated
+    ]);
+    return { success: true, bank: updated };
+  }
+
+  if ((cleanPath === '/teacher/question-banks/import' || cleanPath === '/admin/question-banks/import') && m === 'POST') {
+    const isAdmin = user?.role === 'admin' || user?.role === 'ADMIN' || user?.role === 'superadmin' || user?.role === 'SUPERADMIN';
+    const banks = storageService.getCollection('meritx_question_banks');
+    const id = `bank-${Date.now()}`;
+    const initialStatus = isAdmin ? 'published' : 'submitted';
+    const questions = body?.questions || [];
+    const newBank = {
+      id,
+      title: body?.title || 'Imported Question Bank',
+      subject: body?.subject || 'Physics',
+      status: initialStatus,
+      createdBy: user?.name || (isAdmin ? 'Admin' : 'Teacher'),
+      teacherName: user?.name || (isAdmin ? 'Admin' : 'Teacher'),
+      questions,
+      questionCount: questions.length,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    let newExam = null;
+    if (isAdmin) {
+      const examId = `pub-exam-${Date.now().toString().slice(-6)}`;
+      newExam = {
+        id: examId,
+        bankId: id,
+        title: newBank.title,
+        type: 'Official Practice Exam',
+        category: 'Official Mock Assessments',
+        subject: newBank.subject,
+        duration: 180,
+        questionsCount: questions.length || 30,
+        marks: (questions.length || 30) * 4,
+        passingMarks: Math.round((questions.length || 30) * 4 * 0.4),
+        status: 'published',
+        registrationOpen: true,
+        fee: 0,
+        negativeMarking: true
+      };
+      newBank.assignedExamId = examId;
+      const exams = storageService.getCollection(STORAGE_KEYS.EXAMS);
+      storageService.saveCollection(STORAGE_KEYS.EXAMS, [newExam, ...exams]);
+    }
+
+    storageService.saveCollection('meritx_question_banks', [newBank, ...banks]);
+    return {
+      success: true,
+      bank: newBank,
+      exam: newExam,
+      message: isAdmin
+        ? `Question bank approved directly and published to examinations as "${newExam?.title}".`
+        : 'Question bank imported and submitted for administrator review and approval.'
+    };
+  }
+
+  if (cleanPath === '/teacher/question-banks/submit' && m === 'POST') {
+    const isAdmin = user?.role === 'admin' || user?.role === 'ADMIN' || user?.role === 'superadmin' || user?.role === 'SUPERADMIN';
+    const banks = storageService.getCollection('meritx_question_banks');
+    const bank = banks.find((b) => b.id === body?.id);
+    if (bank) {
+      bank.status = isAdmin ? 'published' : 'submitted';
+      storageService.saveCollection('meritx_question_banks', banks);
+    }
+    return {
+      success: true,
+      bank,
+      message: isAdmin ? 'Question bank approved directly and published to examinations!' : 'Question bank submitted successfully for administrator approval.'
+    };
+  }
+
+  if (cleanPath === '/admin/question-banks/approve' && m === 'POST') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    const bank = banks.find((b) => b.id === body?.id);
+    if (bank) {
+      bank.status = 'approved';
+      storageService.saveCollection('meritx_question_banks', banks);
+    }
+    return { success: true, message: 'Question bank approved for publication.' };
+  }
+
+  if (cleanPath === '/admin/question-banks/reject' && m === 'POST') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    const bank = banks.find((b) => b.id === body?.id);
+    if (bank) {
+      bank.status = 'rejected';
+      bank.rejectionReason = body?.reason || 'Rejection requested.';
+      storageService.saveCollection('meritx_question_banks', banks);
+    }
+    return { success: true, message: 'Question bank rejected.' };
+  }
+
+  if (cleanPath === '/admin/question-banks/publish' && m === 'POST') {
+    const banks = storageService.getCollection('meritx_question_banks');
+    const bank = banks.find((b) => b.id === body?.id);
+    const examId = `pub-exam-${Date.now().toString().slice(-6)}`;
+    if (bank) {
+      bank.status = 'published';
+      bank.assignedExamId = examId;
+      storageService.saveCollection('meritx_question_banks', banks);
+    }
+    const newExam = {
+      id: examId,
+      bankId: body?.id,
+      title: bank?.title || 'Published Exam',
+      type: 'Published Exam',
+      category: 'Official Practice',
+      subject: bank?.subject || 'Physics',
+      duration: 180,
+      questionsCount: bank?.questionCount || 30,
+      marks: (bank?.questionCount || 30) * 4,
+      status: 'published',
+      registrationOpen: true
+    };
+    const exams = storageService.getCollection(STORAGE_KEYS.EXAMS);
+    storageService.saveCollection(STORAGE_KEYS.EXAMS, [newExam, ...exams]);
+    return { success: true, examId, message: 'Examination published to student catalog.' };
+  }
+
   if (cleanPath === '/me/wallet' && m === 'GET') {
     const { walletService } = await import('../services/walletService');
     const myWallet = await walletService.getWallet(user.id);
     const transactions = await walletService.getTransactions(user.id);
+    const deposits = transactions.filter((t) => t.type === 'credit' || t.type === 'deposit');
+    const totalCredits = deposits.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const debits = transactions.filter((t) => t.type === 'debit' || t.type === 'withdrawal');
+    const totalDebits = debits.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const withdrawals = transactions.filter((t) => t.type === 'withdrawal');
     return {
-      balance: myWallet.balance,
-      availableBalance: myWallet.availableBalance,
+      balance: myWallet.balance ?? 0,
+      availableBalance: myWallet.availableBalance ?? 0,
       currency: 'INR',
       lockedBalance: 0,
-      totalCredits: 2000,
-      totalDebits: 99,
-      wallet: myWallet,
-      deposits: transactions.filter((t) => t.type === 'credit'),
-      withdrawals: [{ id: 'wd-1', amount: 400, status: 'approved', upiId: 'student@demo', createdAt: new Date().toISOString() }],
+      totalCredits,
+      totalDebits,
+      totalDeposited: totalCredits,
+      totalSpent: debits.filter((t) => t.type === 'debit').reduce((sum, t) => sum + Number(t.amount || 0), 0),
+      wallet: {
+        ...myWallet,
+        totalDeposited: totalCredits,
+        totalSpent: debits.filter(t => t.type === 'debit').reduce((sum, t) => sum + Number(t.amount || 0), 0),
+        transactions
+      },
+      deposits,
+      withdrawals,
       transactions
     };
+  }
+
+  if (cleanPath === '/me/wallet/deposit/order' && m === 'POST') {
+    const numAmount = Number(body?.amount || 0);
+    if (isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      throw new Error('Recharge amount must be between ₹1 and ₹1,000.');
+    }
+    return {
+      orderId: `order_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      amount: numAmount,
+      amountPaise: Math.round(numAmount * 100),
+      currency: 'INR',
+      keyId: 'rzp_test_meritx_demo'
+    };
+  }
+
+  if ((cleanPath === '/me/wallet/deposit/verify' || cleanPath === '/me/wallet/deposit') && m === 'POST') {
+    const numAmount = Number(body?.amount || 0);
+    if (isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      throw new Error('Recharge amount must be between ₹1 and ₹1,000.');
+    }
+    const { walletService } = await import('../services/walletService');
+    const result = await walletService.addMoney({
+      studentId: user.id,
+      studentName: user.name,
+      amount: numAmount,
+      method: body?.method || 'Instant Wallet Recharge (UPI/Demo)'
+    });
+    return {
+      ...result,
+      reference: result.transaction?.id || `DEP-${Date.now()}`,
+      wallet: {
+        availableBalance: result.newBalance,
+        balance: result.newBalance,
+        currency: 'INR'
+      }
+    };
+  }
+
+  if (cleanPath === '/me/wallet/withdraw' && m === 'POST') {
+    const { walletService } = await import('../services/walletService');
+    return walletService.withdrawMoney({
+      studentId: user.id,
+      studentName: user.name,
+      amount: body?.amount,
+      payoutMethod: body?.payoutMethod,
+      destinationDetails: body?.destinationDetails
+    });
+  }
+
+  if (cleanPath === '/me/wallet/transactions' && m === 'GET') {
+    const { walletService } = await import('../services/walletService');
+    const transactions = await walletService.getTransactions(user.id);
+    return { transactions };
+  }
+
+  if (cleanPath === '/me/wallet/withdrawals' && m === 'GET') {
+    const { walletService } = await import('../services/walletService');
+    const transactions = await walletService.getTransactions(user.id);
+    return { withdrawals: transactions.filter((t) => t.type === 'withdrawal') };
   }
 
   if (cleanPath === '/landing-content') {

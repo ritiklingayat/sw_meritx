@@ -32,6 +32,8 @@ router.get('/proctoring/events', AdminController.getProctoringEvents);
 router.get('/proctoring/attempts/:id/timeline', AdminController.getProctoringTimeline);
 
 router.post('/papers/approve', AdminController.approvePaper);
+router.get('/question-banks', AdminController.getQuestionBanks);
+router.post('/question-banks/import', AdminController.importQuestionBank);
 router.post('/question-banks/approve', AdminController.approveQuestionBank);
 router.post('/question-banks/reject', AdminController.rejectQuestionBank);
 router.post('/question-banks/publish', AdminController.publishQuestionBank);

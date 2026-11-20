@@ -213,11 +213,11 @@ export function LiveProctoringDashboard() {
                     <td>
                       <div className="candidate-cell">
                         <div className="candidate-avatar">
-                          {c.studentName?.charAt(0) || "S"}
+                          {(c.studentName || c.candidateName)?.charAt(0) || "S"}
                         </div>
                         <div>
-                          <strong>{c.studentName}</strong>
-                          <span className="candidate-email">{c.studentEmail}</span>
+                          <strong>{c.studentName || c.candidateName || "Candidate"}</strong>
+                          <span className="candidate-email">{c.studentEmail || c.candidateEmail}</span>
                           <span className="candidate-id">ID: {c.studentId}</span>
                         </div>
                       </div>
@@ -225,7 +225,7 @@ export function LiveProctoringDashboard() {
                     <td>
                       <span className="exam-badge">{c.examTitle}</span>
                       <small className="muted" style={{ display: "block", marginTop: 4 }}>
-                        Status: <strong>{c.attemptStatus}</strong>
+                        Status: <strong>{c.attemptStatus || c.status}</strong>
                       </small>
                     </td>
                     <td>
@@ -305,83 +305,94 @@ export function LiveProctoringDashboard() {
               {timelineLoading || !timelineData ? (
                 <Loading />
               ) : (
-                <>
-                  {/* Status Strip */}
-                  <div className="proctor-modal-strip">
-                    <div>
-                      <span className="strip-label">Camera Status</span>
-                      <strong className={timelineData.attempt.cameraStatus === "active" ? "text-green" : "text-red"}>
-                        {timelineData.attempt.cameraStatus === "active" ? "Active Streaming" : "Interrupted"}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="strip-label">Total Warnings</span>
-                      <strong className={timelineData.attempt.warningCount >= 3 ? "text-red" : "text-amber"}>
-                        {timelineData.attempt.warningCount} / 3
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="strip-label">Surveillance Review</span>
-                      <strong className={timelineData.attempt.isFlagged ? "text-red" : "text-green"}>
-                        {timelineData.attempt.isFlagged ? "Flagged for Admin Review" : "Compliant"}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="strip-label">Candidate Consent</span>
-                      <strong>
-                        {timelineData.attempt.consentGivenAt ? "Given & Signed" : "Unverified"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Pre-Exam Verification Checklist */}
-                  <h4 style={{ marginTop: 20, marginBottom: 10 }}>Pre-Examination Verification Checklist</h4>
-                  <div className="verification-checklist-grid">
-                    {Object.entries(timelineData.attempt.verificationChecks || {}).map(([key, val]) => (
-                      <div key={key} className={`verify-item ${val ? "passed" : "failed"}`}>
-                        {val ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                        <span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Warnings Timeline */}
-                  <h4 style={{ marginTop: 24, marginBottom: 10 }}>Surveillance Warnings Log</h4>
-                  {timelineData.warnings?.length === 0 ? (
-                    <div className="alert success">No proctoring warnings recorded during this session.</div>
-                  ) : (
-                    <div className="proctor-timeline">
-                      {timelineData.warnings.map((w) => (
-                        <div key={w.id} className={`timeline-entry warn-${w.warningNumber}`}>
-                          <div className="timeline-badge">
-                            {w.warningNumber}
-                          </div>
-                          <div className="timeline-content">
-                            <div className="timeline-meta">
-                              <strong>Warning {w.warningNumber}/3: {w.category.replace(/_/g, " ").toUpperCase()}</strong>
-                              <span>{new Date(w.timestamp).toLocaleTimeString()}</span>
-                            </div>
-                            <p>{w.message}</p>
-                          </div>
+                (() => {
+                  const attempt = timelineData.attempt || {};
+                  const warnings = timelineData.warnings || [];
+                  const events = timelineData.events || [];
+                  return (
+                    <>
+                      {/* Status Strip */}
+                      <div className="proctor-modal-strip">
+                        <div>
+                          <span className="strip-label">Camera Status</span>
+                          <strong className={attempt.cameraStatus === "active" ? "text-green" : "text-red"}>
+                            {attempt.cameraStatus === "active" ? "Active Streaming" : "Interrupted"}
+                          </strong>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Full Event Stream */}
-                  <h4 style={{ marginTop: 24, marginBottom: 10 }}>Chronological Surveillance Event Log</h4>
-                  <div className="proctor-event-stream">
-                    {timelineData.events?.map((ev) => (
-                      <div key={ev.id} className={`event-stream-row sev-${ev.severity}`}>
-                        <span className="event-time">{new Date(ev.timestamp).toLocaleTimeString()}</span>
-                        <span className={`event-badge badge-${ev.severity}`}>{ev.eventType}</span>
-                        <span className="event-detail">
-                          {typeof ev.details === "object" ? JSON.stringify(ev.details) : ev.details}
-                        </span>
+                        <div>
+                          <span className="strip-label">Total Warnings</span>
+                          <strong className={(attempt.warningCount || 0) >= 3 ? "text-red" : "text-amber"}>
+                            {attempt.warningCount || 0} / 3
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="strip-label">Surveillance Review</span>
+                          <strong className={attempt.isFlagged ? "text-red" : "text-green"}>
+                            {attempt.isFlagged ? "Flagged for Admin Review" : "Compliant"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="strip-label">Candidate Consent</span>
+                          <strong>
+                            {attempt.consentGivenAt ? "Given & Signed" : "Unverified"}
+                          </strong>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </>
+
+                      {/* Pre-Exam Verification Checklist */}
+                      <h4 style={{ marginTop: 20, marginBottom: 10 }}>Pre-Examination Verification Checklist</h4>
+                      <div className="verification-checklist-grid">
+                        {Object.entries(attempt.verificationChecks || {}).map(([key, val]) => (
+                          <div key={key} className={`verify-item ${val ? "passed" : "failed"}`}>
+                            {val ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                            <span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Warnings Timeline */}
+                      <h4 style={{ marginTop: 24, marginBottom: 10 }}>Surveillance Warnings Log</h4>
+                      {warnings.length === 0 ? (
+                        <div className="alert success">No proctoring warnings recorded during this session.</div>
+                      ) : (
+                        <div className="proctor-timeline">
+                          {warnings.map((w) => (
+                            <div key={w.id} className={`timeline-entry warn-${w.warningNumber || 1}`}>
+                              <div className="timeline-badge">
+                                {w.warningNumber || 1}
+                              </div>
+                              <div className="timeline-content">
+                                <div className="timeline-meta">
+                                  <strong>Warning {w.warningNumber || 1}/3: {(w.category || "VIOLATION").replace(/_/g, " ").toUpperCase()}</strong>
+                                  <span>{w.timestamp ? new Date(w.timestamp).toLocaleTimeString() : "—"}</span>
+                                </div>
+                                <p>{w.message || "Proctoring violation recorded."}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Full Event Stream */}
+                      <h4 style={{ marginTop: 24, marginBottom: 10 }}>Chronological Surveillance Event Log</h4>
+                      <div className="proctor-event-stream">
+                        {events.length === 0 ? (
+                          <p className="muted" style={{ padding: 12 }}>No telemetry events recorded for this candidate.</p>
+                        ) : (
+                          events.map((ev) => (
+                            <div key={ev.id} className={`event-stream-row sev-${ev.severity || "warning"}`}>
+                              <span className="event-time">{ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : "—"}</span>
+                              <span className={`event-badge badge-${ev.severity || "warning"}`}>{ev.eventType || "EVENT"}</span>
+                              <span className="event-detail">
+                                {typeof ev.details === "object" ? JSON.stringify(ev.details) : (ev.details || ev.description || "—")}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  );
+                })()
               )}
             </div>
 

@@ -2,6 +2,21 @@ import { prisma } from '../config/prisma.js';
 import { NotFoundError, BadRequestError, ConflictError } from '../utils/errors.js';
 import { ScoringService } from './scoring.service.js';
 
+export function formatExam(e) {
+  if (!e) return null;
+  const cfg = (e.configuration && typeof e.configuration === 'object') ? e.configuration : {};
+  return {
+    ...e,
+    questions: e.questionsCount ?? e.questions ?? 30,
+    fee: Math.round(Number(e.fee || 0) / 100),
+    negativeMarkValue: cfg.negativeMarkValue ?? (e.negativeMarking ? 1 : 0),
+    cameraRequired: cfg.cameraRequired ?? (e.proctoringRequired ?? true),
+    micRequired: cfg.micRequired ?? (e.proctoringRequired ?? true),
+    showResultsImmediate: cfg.showResultsImmediate ?? true,
+    enableLeaderboard: cfg.enableLeaderboard ?? true
+  };
+}
+
 export class ExamService {
   static async getExams({ search = '', type = '', status = '', courseId = '' } = {}) {
     const where = {};
@@ -33,17 +48,14 @@ export class ExamService {
       orderBy: { createdAt: 'desc' }
     });
 
-    return exams.map((e) => ({
-      ...e,
-      fee: Math.round(Number(e.fee || 0) / 100) // return fee in ₹ to match frontend format
-    }));
+    return exams.map(formatExam);
   }
 
   static async getExamById(id) {
     if (!id) {
       const first = await prisma.exam.findFirst();
       if (!first) throw new NotFoundError('No examinations found.');
-      return { ...first, fee: Math.round(Number(first.fee || 0) / 100) };
+      return formatExam(first);
     }
 
     // 1. Exact match
@@ -51,13 +63,13 @@ export class ExamService {
       where: { id }
     });
 
-    if (exam) return { ...exam, fee: Math.round(Number(exam.fee || 0) / 100) };
+    if (exam) return formatExam(exam);
 
     // 2. Course ID match
     exam = await prisma.exam.findFirst({
       where: { courseId: id }
     });
-    if (exam) return { ...exam, fee: Math.round(Number(exam.fee || 0) / 100) };
+    if (exam) return formatExam(exam);
 
     // 3. Match type or title keywords
     const clean = String(id).toLowerCase();
@@ -71,11 +83,11 @@ export class ExamService {
       }
     });
 
-    if (exam) return { ...exam, fee: Math.round(Number(exam.fee || 0) / 100) };
+    if (exam) return formatExam(exam);
 
     // Safe fallback: return first exam
     const fallback = await prisma.exam.findFirst();
-    return fallback ? { ...fallback, fee: Math.round(Number(fallback.fee || 0) / 100) } : null;
+    return fallback ? formatExam(fallback) : null;
   }
 
   static async registerExam(studentId, examId) {
@@ -122,7 +134,7 @@ export class ExamService {
         wallet = await tx.wallet.create({
           data: {
             userId: studentId,
-            balancePaise: BigInt(150000), // ₹1,500
+            balancePaise: BigInt(0), // ₹0 default
             currency: 'INR'
           }
         });
@@ -208,11 +220,39 @@ export class ExamService {
 
   static async createExam(examData) {
     const feePaise = Number(examData.fee || 0) * 100;
+
+    let configuration = examData.configuration;
+    if (configuration && typeof configuration === 'object') {
+      configuration = {
+        ...configuration,
+        ...(examData.negativeMarkValue !== undefined && { negativeMarkValue: Number(examData.negativeMarkValue) }),
+        ...(examData.cameraRequired !== undefined && { cameraRequired: Boolean(examData.cameraRequired) }),
+        ...(examData.micRequired !== undefined && { micRequired: Boolean(examData.micRequired) }),
+        ...(examData.showResultsImmediate !== undefined && { showResultsImmediate: Boolean(examData.showResultsImmediate) }),
+        ...(examData.enableLeaderboard !== undefined && { enableLeaderboard: Boolean(examData.enableLeaderboard) })
+      };
+    } else if (
+      examData.negativeMarkValue !== undefined ||
+      examData.cameraRequired !== undefined ||
+      examData.micRequired !== undefined ||
+      examData.showResultsImmediate !== undefined ||
+      examData.enableLeaderboard !== undefined
+    ) {
+      configuration = {
+        ...(examData.negativeMarkValue !== undefined && { negativeMarkValue: Number(examData.negativeMarkValue) }),
+        ...(examData.cameraRequired !== undefined && { cameraRequired: Boolean(examData.cameraRequired) }),
+        ...(examData.micRequired !== undefined && { micRequired: Boolean(examData.micRequired) }),
+        ...(examData.showResultsImmediate !== undefined && { showResultsImmediate: Boolean(examData.showResultsImmediate) }),
+        ...(examData.enableLeaderboard !== undefined && { enableLeaderboard: Boolean(examData.enableLeaderboard) })
+      };
+    }
+
     const created = await prisma.exam.create({
       data: {
         id: examData.id || `exam-${Date.now()}`,
         patternId: examData.patternId || null,
         courseId: examData.courseId || null,
+        bankId: examData.bankId || null,
         title: examData.title,
         type: examData.type || 'Mock Exam',
         category: examData.category || 'General',
@@ -232,31 +272,95 @@ export class ExamService {
         syllabus: examData.syllabus || null,
         status: examData.status || 'published',
         registrationOpen: examData.registrationOpen ?? true,
+        imageUrl: examData.imageUrl || null,
         bannerImageUrl: examData.bannerImageUrl || null,
         schedule: examData.schedule || null,
-        configuration: examData.configuration || null
+        configuration: configuration || null
       }
     });
 
-    return {
-      ...created,
-      fee: Math.round(Number(created.fee || 0) / 100)
-    };
+    return formatExam(created);
   }
 
   static async updateExam(id, updates) {
-    const data = { ...updates };
-    if (data.fee !== undefined) {
-      data.fee = Number(data.fee) * 100;
+    const existing = await prisma.exam.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError('Examination not found.');
+
+    const data = {};
+
+    // String fields
+    if (updates.title !== undefined) data.title = String(updates.title);
+    if (updates.description !== undefined) data.description = updates.description !== null ? String(updates.description) : null;
+    if (updates.category !== undefined) data.category = String(updates.category);
+    if (updates.type !== undefined) data.type = String(updates.type);
+    if (updates.subject !== undefined) data.subject = String(updates.subject);
+    if (updates.date !== undefined) data.date = updates.date !== null ? String(updates.date) : null;
+    if (updates.time !== undefined) data.time = updates.time !== null ? String(updates.time) : null;
+    if (updates.tag !== undefined) data.tag = updates.tag !== null ? String(updates.tag) : null;
+    if (updates.syllabus !== undefined) data.syllabus = updates.syllabus !== null ? String(updates.syllabus) : null;
+    if (updates.status !== undefined) data.status = String(updates.status);
+    if (updates.imageUrl !== undefined) data.imageUrl = updates.imageUrl !== null ? String(updates.imageUrl) : null;
+    if (updates.bannerImageUrl !== undefined) data.bannerImageUrl = updates.bannerImageUrl !== null ? String(updates.bannerImageUrl) : null;
+    if (updates.patternId !== undefined) data.patternId = updates.patternId || null;
+    if (updates.courseId !== undefined) data.courseId = updates.courseId || null;
+    if (updates.bankId !== undefined) data.bankId = updates.bankId || null;
+
+    // Number fields
+    if (updates.duration !== undefined) data.duration = Number(updates.duration);
+    if (updates.marks !== undefined) data.marks = Number(updates.marks);
+    if (updates.passingMarks !== undefined) data.passingMarks = Number(updates.passingMarks);
+    if (updates.maxAttempts !== undefined) data.maxAttempts = Number(updates.maxAttempts);
+    if (updates.registeredCount !== undefined) data.registeredCount = Number(updates.registeredCount);
+
+    // Questions count mapping (accepts either questionsCount or questions)
+    if (updates.questionsCount !== undefined) {
+      data.questionsCount = Number(updates.questionsCount);
+    } else if (updates.questions !== undefined) {
+      data.questionsCount = Number(updates.questions);
     }
+
+    // Fee (convert INR to paise)
+    if (updates.fee !== undefined) {
+      data.fee = Math.round(Number(updates.fee) * 100);
+    }
+
+    // Boolean fields
+    if (updates.negativeMarking !== undefined) data.negativeMarking = Boolean(updates.negativeMarking);
+    if (updates.proctoringRequired !== undefined) data.proctoringRequired = Boolean(updates.proctoringRequired);
+    if (updates.registrationOpen !== undefined) data.registrationOpen = Boolean(updates.registrationOpen);
+
+    // JSON fields
+    if (updates.schedule !== undefined) data.schedule = updates.schedule;
+
+    // Configuration JSON with extra settings preserved inside configuration
+    const baseConfig = (updates.configuration && typeof updates.configuration === 'object')
+      ? updates.configuration
+      : ((existing.configuration && typeof existing.configuration === 'object') ? existing.configuration : {});
+
+    const hasExtraConfig =
+      updates.configuration !== undefined ||
+      updates.negativeMarkValue !== undefined ||
+      updates.cameraRequired !== undefined ||
+      updates.micRequired !== undefined ||
+      updates.showResultsImmediate !== undefined ||
+      updates.enableLeaderboard !== undefined;
+
+    if (hasExtraConfig) {
+      data.configuration = {
+        ...baseConfig,
+        ...(updates.negativeMarkValue !== undefined && { negativeMarkValue: Number(updates.negativeMarkValue) }),
+        ...(updates.cameraRequired !== undefined && { cameraRequired: Boolean(updates.cameraRequired) }),
+        ...(updates.micRequired !== undefined && { micRequired: Boolean(updates.micRequired) }),
+        ...(updates.showResultsImmediate !== undefined && { showResultsImmediate: Boolean(updates.showResultsImmediate) }),
+        ...(updates.enableLeaderboard !== undefined && { enableLeaderboard: Boolean(updates.enableLeaderboard) })
+      };
+    }
+
     const updated = await prisma.exam.update({
       where: { id },
       data
     });
-    return {
-      ...updated,
-      fee: Math.round(Number(updated.fee || 0) / 100)
-    };
+    return formatExam(updated);
   }
 
   static async deleteExam(id) {

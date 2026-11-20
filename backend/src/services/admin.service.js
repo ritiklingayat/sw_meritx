@@ -3,14 +3,34 @@ import { NotFoundError } from '../utils/errors.js';
 
 export class AdminService {
   static async getOverview() {
-    const [users, students, exams, registrations, attempts, audit] = await Promise.all([
+    const [users, students, exams, registrations, attempts, audit, questionBanks] = await Promise.all([
       prisma.user.findMany(),
       prisma.user.findMany({ where: { role: 'STUDENT' } }),
-      prisma.exam.findMany(),
+      prisma.exam.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.examRegistration.findMany(),
       prisma.examAttempt.findMany({ where: { status: { in: ['submitted', 'TERMINATED', 'AUTO_SUBMITTED'] } } }),
-      prisma.auditLog.findMany({ take: 20, orderBy: { createdAt: 'desc' } })
+      prisma.auditLog.findMany({ take: 20, orderBy: { createdAt: 'desc' } }),
+      prisma.questionBank.findMany({
+        include: { questions: true, createdBy: true },
+        orderBy: { createdAt: 'desc' }
+      })
     ]);
+
+    const formattedBanks = (questionBanks || []).map((b) => ({
+      id: b.id,
+      title: b.title,
+      subject: b.subject,
+      questionCount: b.questions.length,
+      questions: b.questions,
+      status: b.status,
+      teacherName: b.createdBy?.name || 'Teacher',
+      createdBy: b.createdBy?.name || 'Teacher',
+      createdById: b.createdById,
+      assignedExamId: b.assignedExamId || null,
+      submittedAt: b.submittedAt,
+      rejectionReason: b.rejectionReason,
+      date: b.createdAt.toISOString().split('T')[0]
+    }));
 
     return {
       students: students.length,
@@ -18,11 +38,16 @@ export class AdminService {
       registrations: registrations.length,
       attempts: attempts.length,
       exams: exams.map((e) => ({ ...e, fee: Math.round(Number(e.fee || 0) / 100) })),
-      papers: [
-        { id: 'p-1', title: 'Grand Mock Physics 2026', subject: 'Physics', questions: 25, status: 'approved' },
-        { id: 'p-2', title: 'Inorganic Chemistry Sprint', subject: 'Chemistry', questions: 25, status: 'approved' },
-        { id: 'p-3', title: 'Calculus Mastery Test', subject: 'Mathematics', questions: 25, status: 'approved' }
-      ],
+      papers: formattedBanks.map((b) => ({
+        id: b.id,
+        title: b.title,
+        subject: b.subject,
+        questions: b.questionCount,
+        status: b.status,
+        teacherName: b.teacherName,
+        date: b.date
+      })),
+      questionBanks: formattedBanks,
       audit
     };
   }
@@ -38,7 +63,7 @@ export class AdminService {
     });
 
     return students.map(({ passwordHash: _, ...s }) => {
-      const balance = s.wallet ? Number(s.wallet.balancePaise) / 100 : 1500;
+      const balance = s.wallet ? Number(s.wallet.balancePaise) / 100 : 0;
       return {
         ...s,
         registeredExamsCount: s.registrations.length,
@@ -274,18 +299,48 @@ export class AdminService {
     if (!bank) throw new NotFoundError('Question bank not found.');
 
     const examId = `pub-exam-${Date.now().toString().slice(-6)}`;
+    const questionsCount = bank.questions.length;
+    const marks = questionsCount * 4;
+    const passingMarks = Math.round(marks * 0.4);
+
     const exam = await prisma.exam.create({
       data: {
         id: examId,
         bankId: bank.id,
         title: bank.title,
-        type: 'Published Exam',
-        category: 'Official Practice',
+        type: 'Official Assessment',
+        category: 'Official Mock Assessments',
         subject: bank.subject,
         duration: 180,
-        questionsCount: bank.questions.length,
-        marks: bank.questions.length * 4,
-        status: 'published'
+        questionsCount,
+        marks,
+        passingMarks,
+        negativeMarking: true,
+        status: 'published',
+        registrationOpen: true,
+        proctoringRequired: true,
+        fee: 0,
+        schedule: {
+          startsAt: new Date().toISOString(),
+          endsAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+          registrationOpensAt: new Date().toISOString(),
+          registrationClosesAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+          timezone: 'Asia/Kolkata'
+        },
+        configuration: {
+          cameraRequired: true,
+          micRequired: true,
+          showResultsImmediate: true,
+          enableLeaderboard: true,
+          rules: {
+            single_correct: { correct: 4, incorrect: -1, unanswered: 0 }
+          },
+          instructions: [
+            'Attempt all questions within the allocated duration.',
+            'Each correct answer earns 4 marks; incorrect answers incur -1 mark penalty.',
+            'Continuous webcam proctoring is enabled.'
+          ]
+        }
       }
     });
 
@@ -293,6 +348,8 @@ export class AdminService {
       where: { id: bankId },
       data: {
         status: 'published',
+        approvedById: adminId,
+        approvedAt: new Date(),
         publishedAt: new Date(),
         assignedExamId: exam.id
       }
@@ -310,7 +367,8 @@ export class AdminService {
     return {
       success: true,
       examId: exam.id,
-      message: 'Examination successfully published to student catalog.'
+      exam,
+      message: `Question bank approved and published as live examination "${exam.title}" (ID: ${exam.id}).`
     };
   }
 

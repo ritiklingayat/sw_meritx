@@ -19,7 +19,7 @@ export class WalletService {
     });
 
     if (!wallet) {
-      const initialPaise = BigInt(150000);
+      const initialPaise = BigInt(0);
       wallet = await prisma.wallet.create({
         data: {
           userId,
@@ -77,16 +77,19 @@ export class WalletService {
       lockedBalance: lockedRs,
       totalCredits,
       totalDebits,
+      totalDeposited: totalCredits,
+      totalSpent: totalDebits,
       wallet: {
         id: wallet.id,
         balance: balanceRs,
         availableBalance: balanceRs - lockedRs,
-        currency: 'INR'
+        currency: 'INR',
+        totalDeposited: totalCredits,
+        totalSpent: totalDebits,
+        transactions: formattedTxs
       },
       deposits,
-      withdrawals: withdrawals.length ? withdrawals : [
-        { id: 'wd-1', amount: 400, status: 'approved', upiId: 'student@demo', createdAt: new Date().toISOString() }
-      ],
+      withdrawals,
       transactions: formattedTxs
     };
   }
@@ -119,9 +122,9 @@ export class WalletService {
   }
 
   static async depositOrder({ userId, amount }) {
-    const numAmount = Number(amount || 500);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      throw new BadRequestError('Invalid deposit amount.');
+    const numAmount = Number(amount || 0);
+    if (isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      throw new BadRequestError('Deposit amount must be between ₹1 and ₹1,000.');
     }
 
     const amountPaise = BigInt(Math.round(numAmount * 100));
@@ -244,8 +247,8 @@ export class WalletService {
 
   static async addMoney({ userId, amount = 500, method = 'UPI / Instant Demo Recharge' }) {
     const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      throw new BadRequestError('Deposit amount must be a positive number.');
+    if (isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      throw new BadRequestError('Deposit amount must be between ₹1 and ₹1,000.');
     }
 
     const amountPaise = BigInt(Math.round(numAmount * 100));

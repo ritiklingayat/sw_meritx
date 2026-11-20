@@ -86,27 +86,12 @@ export class AuthService {
         }
       });
 
-      const initialPaise = BigInt(150000); // ₹1,500 demo balance
-      const wallet = await tx.wallet.create({
+      const initialPaise = BigInt(0); // ₹0 default balance
+      await tx.wallet.create({
         data: {
           userId: newUser.id,
           balancePaise: initialPaise,
           currency: 'INR'
-        }
-      });
-
-      await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          userId: newUser.id,
-          type: 'deposit',
-          direction: 'credit',
-          amountPaise: initialPaise,
-          balanceBeforePaise: BigInt(0),
-          balanceAfterPaise: initialPaise,
-          status: 'successful',
-          referenceId: `REG-WELCOME-${newUser.id}`,
-          description: 'Welcome Demo Account Credits'
         }
       });
 
@@ -127,7 +112,7 @@ export class AuthService {
     const cleanEmail = String(email || '').trim().toLowerCase();
     const user = await prisma.user.findUnique({
       where: { email: cleanEmail },
-      include: { profile: true }
+      include: { profile: true, wallet: true }
     });
 
     if (!user) {
@@ -146,6 +131,16 @@ export class AuthService {
       }
     } else if (password !== 'Student@123' && password !== 'Admin@123' && password !== 'Teacher@123' && password !== 'Super@123') {
       throw new UnauthorizedError('Invalid email or password.');
+    }
+
+    if (!user.wallet) {
+      user.wallet = await prisma.wallet.create({
+        data: {
+          userId: user.id,
+          balancePaise: BigInt(0),
+          currency: 'INR'
+        }
+      }).catch(() => null);
     }
 
     const safeUser = this.formatSafeUser(user);
@@ -220,7 +215,7 @@ export class AuthService {
           }
         });
 
-        const initialPaise = BigInt(150000);
+        const initialPaise = BigInt(0);
         await tx.wallet.create({
           data: {
             userId: created.id,
@@ -301,6 +296,16 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundError('User not found.');
+    }
+
+    if (!user.wallet) {
+      user.wallet = await prisma.wallet.create({
+        data: {
+          userId: user.id,
+          balancePaise: BigInt(0),
+          currency: 'INR'
+        }
+      }).catch(() => null);
     }
 
     return this.formatSafeUser(user);

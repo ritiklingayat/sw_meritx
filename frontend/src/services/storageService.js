@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
   WALLETS: 'meritx_wallets',
   WALLET_TRANSACTIONS: 'meritx_wallet_transactions',
   PROCTORING: 'meritx_proctoring_events',
-  INITIALIZED: 'meritx_exam_platform_v6'
+  INITIALIZED: 'meritx_exam_platform_v8'
 };
 
 class StorageService {
@@ -30,11 +30,15 @@ class StorageService {
 
     // Check version migration to ensure clean examination platform upgrade
     const isUpgraded = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
-    if (!isUpgraded || isUpgraded !== 'meritx_exam_platform_v6') {
+    if (!isUpgraded || isUpgraded !== 'meritx_exam_platform_v8') {
       // Clear legacy course keys if present and reload updated exam definitions
       localStorage.removeItem('meritx_courses');
       localStorage.removeItem('meritx_enrollments');
       this.set(STORAGE_KEYS.EXAMS, examsSeed);
+      this.set(STORAGE_KEYS.WALLETS, [
+        { studentId: 'student-1', balance: 1, availableBalance: 1, currency: 'INR', lockedBalance: 0 },
+        { studentId: 'student-2', balance: 0, availableBalance: 0, currency: 'INR', lockedBalance: 0 }
+      ]);
       this.set(STORAGE_KEYS.REGISTRATIONS, [
         {
           id: 'reg-01',
@@ -43,7 +47,7 @@ class StorageService {
           studentName: 'Aarav Sharma',
           examId: 'jee-main-01',
           examTitle: 'JEE Main Grand Mock 01',
-          amountPaid: 2,
+          amountPaid: 0,
           paymentStatus: 'successful',
           status: 'confirmed',
           registeredAt: '2026-10-01T12:00:00.000Z',
@@ -78,43 +82,25 @@ class StorageService {
       ]);
       this.set(STORAGE_KEYS.WALLET_TRANSACTIONS, [
         {
-          id: 'tx-001',
-          transactionId: 'tx-001',
+          id: 'tx-dep-1rs',
+          transactionId: 'tx-dep-1rs',
           studentId: 'student-1',
           studentName: 'Aarav Sharma',
           examId: null,
           examTitle: null,
           transactionType: 'credit',
           type: 'credit',
-          amount: 1500,
+          amount: 1,
           balanceBefore: 0,
-          balanceAfter: 1500,
-          timestamp: '2026-10-01T10:00:00.000Z',
-          createdAt: '2026-10-01T10:00:00.000Z',
+          balanceAfter: 1,
+          timestamp: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
           status: 'successful',
-          description: 'Demo Wallet Recharge (UPI)',
-          memo: 'Demo Wallet Recharge (UPI)'
-        },
-        {
-          id: 'tx-002',
-          transactionId: 'tx-002',
-          studentId: 'student-1',
-          studentName: 'Aarav Sharma',
-          examId: 'jee-main-01',
-          examTitle: 'JEE Main Grand Mock 01',
-          transactionType: 'debit',
-          type: 'debit',
-          amount: 2,
-          balanceBefore: 1502,
-          balanceAfter: 1500,
-          timestamp: '2026-10-01T12:00:00.000Z',
-          createdAt: '2026-10-01T12:00:00.000Z',
-          status: 'successful',
-          description: 'Registration: JEE Main Grand Mock 01',
-          memo: 'Registration Fee: JEE Main Grand Mock 01'
+          description: 'Wallet Deposit (Razorpay Payment Gateway)',
+          memo: 'Wallet Deposit (Razorpay Payment Gateway)'
         }
       ]);
-      localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'meritx_exam_platform_v6');
+      localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'meritx_exam_platform_v8');
     }
 
     // Initialize collections if missing in localStorage
@@ -134,44 +120,7 @@ class StorageService {
       this.set(STORAGE_KEYS.WALLETS, walletsSeed.wallets || []);
     }
     if (!localStorage.getItem(STORAGE_KEYS.WALLET_TRANSACTIONS)) {
-      this.set(STORAGE_KEYS.WALLET_TRANSACTIONS, [
-        {
-          id: 'tx-001',
-          transactionId: 'tx-001',
-          studentId: 'student-1',
-          studentName: 'Aarav Sharma',
-          examId: null,
-          examTitle: null,
-          transactionType: 'credit',
-          type: 'credit',
-          amount: 1500,
-          balanceBefore: 0,
-          balanceAfter: 1500,
-          timestamp: '2026-10-01T10:00:00.000Z',
-          createdAt: '2026-10-01T10:00:00.000Z',
-          status: 'successful',
-          description: 'Demo Wallet Recharge (UPI)',
-          memo: 'Demo Wallet Recharge (UPI)'
-        },
-        {
-          id: 'tx-002',
-          transactionId: 'tx-002',
-          studentId: 'student-1',
-          studentName: 'Aarav Sharma',
-          examId: 'jee-main-01',
-          examTitle: 'JEE Main Grand Mock 01',
-          transactionType: 'debit',
-          type: 'debit',
-          amount: 2,
-          balanceBefore: 1502,
-          balanceAfter: 1500,
-          timestamp: '2026-10-01T12:00:00.000Z',
-          createdAt: '2026-10-01T12:00:00.000Z',
-          status: 'successful',
-          description: 'Registration: JEE Main Grand Mock 01',
-          memo: 'Registration Fee: JEE Main Grand Mock 01'
-        }
-      ]);
+      this.set(STORAGE_KEYS.WALLET_TRANSACTIONS, []);
     }
     if (!localStorage.getItem(STORAGE_KEYS.TICKETS)) {
       this.set(STORAGE_KEYS.TICKETS, walletsSeed.tickets || []);

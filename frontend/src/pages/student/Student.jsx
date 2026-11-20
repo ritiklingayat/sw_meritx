@@ -73,7 +73,16 @@ export function useWallet() {
     setLoading(true);
     return api("/me/wallet", { token })
       .then((data) => {
-        const w = data.wallet || data;
+        const baseWallet = data.wallet || {};
+        const w = {
+          ...data,
+          ...baseWallet,
+          balance: baseWallet.balance ?? data.balance ?? 0,
+          availableBalance: baseWallet.availableBalance ?? data.availableBalance ?? 0,
+          totalDeposited: data.totalDeposited ?? data.totalCredits ?? baseWallet.totalDeposited ?? 0,
+          totalSpent: data.totalSpent ?? data.totalDebits ?? baseWallet.totalSpent ?? 0,
+          transactions: data.transactions || baseWallet.transactions || []
+        };
         setWallet(w);
         setError("");
         return w;
@@ -105,9 +114,9 @@ export function loadRazorpayScript() {
 /* ==========================================================================
    Add Money Modal (Razorpay Gateway & Demo Top-Up Flow)
    ========================================================================== */
-export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 0 }) {
+export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 0, initialAmount = 500 }) {
   const { token, user } = useAuth();
-  const [amount, setAmount] = useState(500);
+  const [amount, setAmount] = useState(() => Math.min(1000, Math.max(1, Number(initialAmount) || 500)));
   const [method, setMethod] = useState("UPI / Razorpay");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -117,8 +126,9 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
 
   async function handleTopUp(e) {
     if (e) e.preventDefault();
-    if (!amount || Number(amount) < 10) {
-      setError("Minimum recharge amount is ₹10.");
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount < 1 || numAmount > 1000) {
+      setError("Recharge amount must be between ₹1 and ₹1,000.");
       return;
     }
     setBusy(true);
@@ -254,7 +264,7 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
                 Select Top-Up Amount (₹)
               </label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                {[100, 200, 500, 1000, 2000].map((amt) => (
+                {[50, 100, 200, 500, 1000].map((amt) => (
                   <button
                     key={amt}
                     type="button"
@@ -268,14 +278,16 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
               </div>
               <input
                 type="number"
-                min="10"
-                max="50000"
+                min="1"
+                max="1000"
+                step="1"
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
                 style={{ width: "100%", padding: "10px 14px", fontSize: 15, fontWeight: 700, borderRadius: 10, border: "1px solid #cbd5e1" }}
-                placeholder="Enter custom amount..."
+                placeholder="Enter amount between ₹1 and ₹1,000..."
                 required
               />
+              <small style={{ display: "block", color: "#64748b", marginTop: 4, fontSize: 12 }}>Allowed range: ₹1 to ₹1,000</small>
             </div>
 
             <div style={{ marginBottom: 20 }}>
@@ -303,7 +315,7 @@ export function AddMoneyModal({ isOpen, onClose, onMoneyAdded, currentBalance = 
               <button type="button" className="btn btn-outline" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={busy || amount <= 0}>
+              <button type="submit" className="btn btn-primary" disabled={busy || !amount || Number(amount) < 1 || Number(amount) > 1000}>
                 {busy ? "Processing..." : `Deposit ${money(amount)} Now`}
               </button>
             </div>
@@ -538,7 +550,7 @@ export function ExamRegistrationModal({ exam, wallet, onClose, onRegistered, onA
   if (!exam) return null;
 
   const price = Number(exam.fee ?? 0);
-  const availableBalance = Number(wallet?.availableBalance ?? wallet?.balance ?? 1500);
+  const availableBalance = Number(wallet?.availableBalance ?? wallet?.balance ?? 0);
   const hasSufficient = availableBalance >= price;
   const shortfall = Math.max(0, price - availableBalance);
   const remaining = Math.max(0, availableBalance - price);
@@ -764,7 +776,7 @@ export function StudentDashboard() {
     ? Math.round(attempts.reduce((s, a) => s + (a.result?.accuracy || 0), 0) / attempts.length)
     : 0;
 
-  const currentWallet = wallet || data.wallet || { availableBalance: 1500, transactions: [] };
+  const currentWallet = wallet || data.wallet || { availableBalance: 0, balance: 0, transactions: [] };
   const recentTransactions = (currentWallet.transactions || []).slice(0, 5);
 
   return (
@@ -1503,8 +1515,8 @@ export function MyWallet() {
     const matchType =
       filter === "all" ||
       tx.type === filter ||
-      (filter === "debit" && (tx.type === "exam_registration" || tx.type === "course_purchase" || tx.type === "withdrawal")) ||
-      (filter === "credit" && (tx.type === "deposit" || tx.type === "refund"));
+      (filter === "debit" && (tx.type === "debit" || tx.type === "exam_registration" || tx.type === "course_purchase" || tx.type === "withdrawal")) ||
+      (filter === "credit" && (tx.type === "credit" || tx.type === "deposit" || tx.type === "refund"));
 
     const matchSearch =
       !search ||
@@ -1746,18 +1758,19 @@ export function AddMoney() {
   const { wallet, refresh: refreshWallet } = useWallet();
   const navigate = useNavigate();
 
-  const [amount, setAmount] = useState(1000);
+  const [amount, setAmount] = useState(500);
   const [method, setMethod] = useState("upi");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState(null);
 
-  const presets = [500, 1000, 2000, 5000];
+  const presets = [50, 100, 200, 500, 1000];
 
   async function handleDeposit(e) {
     e.preventDefault();
-    if (amount < 10) {
-      setError("Minimum deposit amount is ₹10.");
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount < 1 || numAmount > 1000) {
+      setError("Deposit amount must be between ₹1 and ₹1,000.");
       return;
     }
     setBusy(true);
@@ -1899,7 +1912,7 @@ export function AddMoney() {
                 className="btn btn-outline"
                 onClick={() => {
                   setReceipt(null);
-                  setAmount(1000);
+                  setAmount(500);
                 }}
               >
                 Add More Funds
@@ -1931,15 +1944,18 @@ export function AddMoney() {
                 <span className="currency-prefix">₹</span>
                 <input
                   type="number"
-                  min="10"
-                  max="100000"
+                  min="1"
+                  max="1000"
                   step="1"
                   required
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
-                  placeholder="Enter custom amount"
+                  placeholder="Enter custom amount (₹1 - ₹1,000)"
                 />
               </div>
+              <small style={{ display: "block", color: "#64748b", marginTop: 6, fontSize: 12 }}>
+                Minimum recharge ₹1, maximum ₹1,000 per transaction.
+              </small>
             </div>
 
             <div className="field" style={{ marginTop: 24 }}>
@@ -2013,7 +2029,7 @@ export function AddMoney() {
               type="submit"
               className="btn btn-primary"
               style={{ width: "100%", marginTop: 24 }}
-              disabled={busy}
+              disabled={busy || !amount || Number(amount) < 1 || Number(amount) > 1000}
             >
               {busy ? "Processing Simulated Payment..." : `Proceed to Deposit ${money(amount)} (Demo)`}
             </button>

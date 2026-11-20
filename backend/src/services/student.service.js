@@ -36,7 +36,7 @@ export class StudentService {
       .map((e) => ({ ...e, fee: Math.round(Number(e.fee || 0) / 100) }));
 
     const completedAttempts = attempts.filter((a) => ['submitted', 'TERMINATED', 'AUTO_SUBMITTED'].includes(a.status));
-    const balanceRs = wallet ? Number(wallet.balancePaise) / 100 : 1500;
+    const balanceRs = wallet ? Number(wallet.balancePaise) / 100 : 0;
 
     return {
       stats: {

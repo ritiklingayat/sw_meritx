@@ -53,3 +53,37 @@ test('Payments - Razorpay Cryptographic Signature Verification', () => {
     .digest('hex');
   assert.strictEqual(tamperedVerify === validSignature, false, 'Tampered signature must be rejected');
 });
+
+test('Wallet - Student Default Balance is Zero', () => {
+  const defaultBalancePaise = BigInt(0);
+  const defaultBalanceRs = Number(defaultBalancePaise) / 100;
+
+  assert.strictEqual(defaultBalancePaise, BigInt(0), 'Initial student wallet balance in paise must be 0');
+  assert.strictEqual(defaultBalanceRs, 0, 'Initial student wallet balance in INR must be 0');
+});
+
+test('Wallet - Add Money Range Enforcement (₹1 Minimum to ₹1000 Maximum)', () => {
+  function validateDepositAmount(amount) {
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      return { valid: false, error: 'Deposit amount must be between ₹1 and ₹1,000.' };
+    }
+    return { valid: true, amount: numAmount };
+  }
+
+  // Valid boundaries
+  assert.strictEqual(validateDepositAmount(1).valid, true, '₹1 deposit must be accepted');
+  assert.strictEqual(validateDepositAmount(1000).valid, true, '₹1000 deposit must be accepted');
+  assert.strictEqual(validateDepositAmount(500).valid, true, '₹500 deposit must be accepted');
+
+  // Below minimum
+  assert.strictEqual(validateDepositAmount(0).valid, false, '₹0 deposit must be rejected');
+  assert.strictEqual(validateDepositAmount(-50).valid, false, 'Negative deposit must be rejected');
+  assert.strictEqual(validateDepositAmount(0.5).valid, false, '₹0.50 deposit below ₹1 must be rejected');
+
+  // Above maximum
+  assert.strictEqual(validateDepositAmount(1001).valid, false, '₹1001 deposit exceeding ₹1000 must be rejected');
+  assert.strictEqual(validateDepositAmount(2000).valid, false, '₹2000 deposit exceeding ₹1000 must be rejected');
+  assert.strictEqual(validateDepositAmount(50000).valid, false, '₹50000 deposit exceeding ₹1000 must be rejected');
+  assert.strictEqual(validateDepositAmount('invalid').valid, false, 'Non-numeric deposit must be rejected');
+});

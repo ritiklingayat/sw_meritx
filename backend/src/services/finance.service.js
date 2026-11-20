@@ -226,7 +226,7 @@ export class FinanceService {
 
     return {
       wallets: users.map((u) => {
-        const bal = u.wallet ? Number(u.wallet.balancePaise) / 100 : 1500;
+        const bal = u.wallet ? Number(u.wallet.balancePaise) / 100 : 0;
         return {
           studentId: u.id,
           studentName: u.name,
@@ -261,7 +261,7 @@ export class FinanceService {
       }
     });
 
-    const bal = user?.wallet ? Number(user.wallet.balancePaise) / 100 : 1500;
+    const bal = user?.wallet ? Number(user.wallet.balancePaise) / 100 : 0;
 
     return {
       student: {

@@ -53,6 +53,7 @@ export const routes = {
     ["/admin", "Dashboard", LayoutDashboard],
     ["/admin/students", "Students", Users],
     ["/admin/exams", "Exams", ClipboardList],
+    ["/admin/question-banks", "Question Banks", BookOpen],
     ["/admin/registrations", "Registrations", ListChecks],
     ["/admin/transactions", "Wallet Transactions", Wallet],
     ["/admin/results", "Results", BarChart3],

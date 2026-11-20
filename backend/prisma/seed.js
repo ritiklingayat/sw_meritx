@@ -90,11 +90,11 @@ async function main() {
       }
     });
 
-    // Create wallet with initial starting balance in paise (₹1,500 = 150000 paise)
-    const initialPaise = BigInt(150000);
+    // Create wallet with zero initial starting balance for students
+    const initialPaise = user.role === 'STUDENT' ? BigInt(0) : BigInt(150000);
     const wallet = await prisma.wallet.upsert({
       where: { userId: user.id },
-      update: {},
+      update: user.role === 'STUDENT' ? { balancePaise: BigInt(0) } : {},
       create: {
         userId: user.id,
         balancePaise: initialPaise,
@@ -103,13 +103,13 @@ async function main() {
       }
     });
 
-    // Create initial deposit transaction record
+    // Create initial deposit transaction record only for non-student demo accounts
     const refId = `DEP-INIT-${user.id}`;
     const existingTx = await prisma.walletTransaction.findUnique({
       where: { referenceId: refId }
     });
 
-    if (!existingTx) {
+    if (!existingTx && initialPaise > BigInt(0)) {
       await prisma.walletTransaction.create({
         data: {
           walletId: wallet.id,

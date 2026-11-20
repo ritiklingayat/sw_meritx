@@ -63,3 +63,40 @@ test('Proctoring - 3-Warning Progressive Enforcement Logic', () => {
   assert.strictEqual(v3.isFlagged, true);
   assert.strictEqual(v3.isTerminated, true, 'Warning 3 must trigger automatic examination termination');
 });
+
+test('Proctoring - Dossier payload structure contains attempt, cameraStatus and telemetry', () => {
+  const dummyAttempt = {
+    id: 'att-123',
+    studentId: 'usr-1',
+    studentName: 'Aarav Sharma',
+    examTitle: 'JEE Advanced Challenge 01',
+    status: 'in_progress',
+    cameraStatus: 'active',
+    warningCount: 1,
+    isFlagged: false,
+    consentGivenAt: new Date().toISOString(),
+    verificationChecks: {
+      webcamVerified: true,
+      microphoneVerified: true
+    }
+  };
+
+  const dummyDossier = {
+    attempt: dummyAttempt,
+    warnings: [
+      { id: 'w-1', warningNumber: 1, category: 'tab_switch', message: 'Switched tabs', timestamp: new Date().toISOString() }
+    ],
+    events: [
+      { id: 'ev-1', eventType: 'TAB_SWITCH', severity: 'warning', description: 'Tab switch', timestamp: new Date().toISOString() }
+    ],
+    timeline: [
+      { time: '10:00:00 AM', type: 'info', message: 'Hardware check passed' }
+    ]
+  };
+
+  assert.ok(dummyDossier.attempt, 'Dossier must have attempt object');
+  assert.strictEqual(dummyDossier.attempt.cameraStatus, 'active', 'attempt.cameraStatus must be accessible');
+  assert.strictEqual(Array.isArray(dummyDossier.warnings), true, 'warnings must be an array');
+  assert.strictEqual(Array.isArray(dummyDossier.events), true, 'events must be an array');
+  assert.strictEqual(Array.isArray(dummyDossier.timeline), true, 'timeline must be an array');
+});

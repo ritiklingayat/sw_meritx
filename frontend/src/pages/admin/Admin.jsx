@@ -221,6 +221,28 @@ export function ManageExams() {
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeSection, setActiveSection] = useState("exams");
+  const [banks, setBanks] = useState([]);
+  const [previewBank, setPreviewBank] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const loadBanks = () => {
+    api("/admin/question-banks", { token })
+      .then((res) => setBanks(res.banks || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadBanks();
+  }, [token]);
+
+  useEffect(() => {
+    if (data?.questionBanks?.length && !banks.length) {
+      setBanks(data.questionBanks);
+    }
+  }, [data?.questionBanks]);
+
+  const pendingSubmissions = banks.filter((b) => b.status === "submitted");
 
   const field = (name, value) => setForm((current) => ({ ...current, [name]: value }));
 
@@ -316,19 +338,19 @@ export function ManageExams() {
       subject: exam.subject || "",
       tag: exam.tag || "",
       status: exam.status || "published",
-      questions: exam.questions || 30,
+      questions: exam.questions || exam.questionsCount || 30,
       marks: exam.marks || 100,
       passingMarks: exam.passingMarks || 40,
       negativeMarking: exam.negativeMarking !== false,
-      negativeMarkValue: exam.negativeMarkValue || 1,
+      negativeMarkValue: exam.configuration?.negativeMarkValue ?? exam.negativeMarkValue ?? 1,
       maxAttempts: exam.maxAttempts || 1,
       fee: exam.fee ?? 0,
       registrationOpen: exam.registrationOpen !== false,
       proctoringRequired: exam.proctoringRequired !== false,
-      cameraRequired: exam.cameraRequired !== false && exam.proctoringRequired !== false,
-      micRequired: exam.micRequired !== false && exam.proctoringRequired !== false,
-      showResultsImmediate: exam.showResultsImmediate !== false,
-      enableLeaderboard: exam.enableLeaderboard !== false,
+      cameraRequired: exam.configuration?.cameraRequired ?? (exam.cameraRequired !== false && exam.proctoringRequired !== false),
+      micRequired: exam.configuration?.micRequired ?? (exam.micRequired !== false && exam.proctoringRequired !== false),
+      showResultsImmediate: exam.configuration?.showResultsImmediate ?? (exam.showResultsImmediate !== false),
+      enableLeaderboard: exam.configuration?.enableLeaderboard ?? (exam.enableLeaderboard !== false),
       imageUrl: exam.imageUrl || null,
       examDate: editFields.examDate,
       startTime: editFields.startTime,
@@ -638,8 +660,260 @@ export function ManageExams() {
         </div>
       )}
 
+      {pendingSubmissions.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "14px 18px",
+            background: "#fffbeb",
+            border: "1.5px solid #f59e0b",
+            borderRadius: 10,
+            marginBottom: 18,
+            boxShadow: "0 2px 6px rgba(245, 158, 11, 0.1)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <AlertTriangle size={24} style={{ color: "#d97706", flexShrink: 0 }} />
+            <div>
+              <strong style={{ fontSize: 14, color: "#92400e" }}>
+                {pendingSubmissions.length} Teacher Question Bank(s) Awaiting Admin Approval
+              </strong>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#b45309" }}>
+                Faculty members have submitted question banks. Review questions and approve them directly to publish as live student examinations.
+              </p>
+            </div>
+          </div>
+          <button
+            className="btn btn-primary small"
+            style={{
+              background: activeSection === "submissions" ? "#64748b" : "#d97706",
+              borderColor: activeSection === "submissions" ? "#64748b" : "#d97706",
+              color: "#fff",
+              whiteSpace: "nowrap",
+              marginLeft: 16,
+            }}
+            onClick={() => setActiveSection(activeSection === "submissions" ? "exams" : "submissions")}
+          >
+            {activeSection === "submissions" ? "Back to Exams Catalog" : `Review Submissions (${pendingSubmissions.length}) →`}
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, borderBottom: "1px solid #e2e8f0", paddingBottom: 8 }}>
+        <button
+          type="button"
+          className={`btn small ${activeSection === "exams" ? "btn-primary" : "btn-outline"}`}
+          onClick={() => setActiveSection("exams")}
+        >
+          <ClipboardList size={14} /> Scheduled Examinations ({examsList.length})
+        </button>
+        <button
+          type="button"
+          className={`btn small ${activeSection === "submissions" ? "btn-primary" : "btn-outline"}`}
+          onClick={() => setActiveSection("submissions")}
+          style={{ position: "relative" }}
+        >
+          <BookOpen size={14} /> Teacher Submissions for Approval ({banks.length})
+          {pendingSubmissions.length > 0 && (
+            <span
+              style={{
+                marginLeft: 6,
+                background: activeSection === "submissions" ? "#fff" : "#f59e0b",
+                color: activeSection === "submissions" ? "#1e293b" : "#fff",
+                padding: "2px 7px",
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 800,
+              }}
+            >
+              {pendingSubmissions.length} Pending
+            </span>
+          )}
+        </button>
+      </div>
+
       {!data ? (
         <Loading />
+      ) : activeSection === "submissions" ? (
+        <div className="panel" style={{ padding: 20 }}>
+          <div className="panel-head" style={{ marginBottom: 16 }}>
+            <div>
+              <h3>Teacher Question Papers & Banks ({banks.length})</h3>
+              <p className="muted">
+                Review questions submitted by faculty, verify answers, and approve them directly to publish as live student examinations.
+              </p>
+            </div>
+            <button className="btn btn-soft small" onClick={loadBanks} title="Refresh submissions">
+              <RefreshCw size={14} /> Refresh Submissions
+            </button>
+          </div>
+
+          {!banks.length ? (
+            <Empty
+              title="No teacher submissions found"
+              text="When teachers import questions or submit examination papers, they will appear here for review and direct approval."
+            />
+          ) : (
+            <div className="admin-catalog-stack">
+              {banks.map((bank) => {
+                const isPending = bank.status === "submitted";
+                const isApproved = bank.status === "approved";
+                const isPublished = bank.status === "published";
+                const isRejected = bank.status === "rejected";
+
+                return (
+                  <div
+                    key={bank.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 16,
+                      padding: "16px 18px",
+                      borderRadius: 10,
+                      background: isPending ? "#fffbeb" : "#fff",
+                      border: isPending ? "1.5px solid #f59e0b" : "1px solid #e2e8f0",
+                      marginBottom: 12,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ minWidth: 260, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <strong style={{ fontSize: 16 }}>{bank.title}</strong>
+                        <span
+                          className={`tag ${
+                            isPublished
+                              ? "green"
+                              : isApproved
+                              ? "green"
+                              : isPending
+                              ? "orange"
+                              : isRejected
+                              ? "red"
+                              : ""
+                          }`}
+                          style={{ textTransform: "capitalize" }}
+                        >
+                          {isPending ? "Pending Approval" : bank.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 14, flexWrap: "wrap" }}>
+                        <span>
+                          <strong>Subject:</strong> {bank.subject}
+                        </span>
+                        <span>
+                          <strong>Questions:</strong> {bank.questionCount || bank.questions?.length || 0}
+                        </span>
+                        <span>
+                          <strong>Author:</strong> {bank.teacherName || bank.createdBy || "Faculty"}
+                        </span>
+                        <span>
+                          <strong>Submitted:</strong> {bank.date || "Recent"}
+                        </span>
+                      </div>
+                      {bank.rejectionReason && (
+                        <div style={{ marginTop: 6, fontSize: 12, color: "#dc2626" }}>
+                          <strong>Revision note:</strong> {bank.rejectionReason}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        className="btn btn-soft small"
+                        disabled={previewLoading}
+                        onClick={async () => {
+                          setPreviewLoading(true);
+                          try {
+                            const res = await api(`/teacher/question-banks/${bank.id}`, { token });
+                            setPreviewBank(res.bank);
+                          } catch (err) {
+                            setMsg(err.message);
+                          } finally {
+                            setPreviewLoading(false);
+                          }
+                        }}
+                      >
+                        <Eye size={14} /> Preview Questions
+                      </button>
+
+                      {(isPending || isApproved) && (
+                        <button
+                          className="btn btn-primary small"
+                          disabled={busy}
+                          style={{ background: "#059669", borderColor: "#059669", color: "#fff" }}
+                          onClick={async () => {
+                            setBusy(true);
+                            setMsg("");
+                            try {
+                              const res = await api("/admin/question-banks/publish", {
+                                method: "POST",
+                                token,
+                                body: { id: bank.id },
+                              });
+                              setMsg(
+                                `Question bank "${bank.title}" approved and published successfully as live examination (ID: ${res.examId})!`
+                              );
+                              refresh();
+                              loadBanks();
+                            } catch (err) {
+                              setMsg(err.message || "Failed to approve and publish question bank.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          <CheckCircle2 size={14} /> Approve & Publish to Exams
+                        </button>
+                      )}
+
+                      {isPending && (
+                        <button
+                          className="btn btn-outline small"
+                          disabled={busy}
+                          style={{ color: "#dc2626", borderColor: "#fca5a5" }}
+                          onClick={async () => {
+                            const reason = window.prompt(
+                              `Enter feedback / revision note for teacher regarding "${bank.title}":`
+                            );
+                            if (!reason?.trim()) return;
+                            setBusy(true);
+                            setMsg("");
+                            try {
+                              await api("/admin/question-banks/reject", {
+                                method: "POST",
+                                token,
+                                body: { id: bank.id, reason },
+                              });
+                              setMsg(`Question bank "${bank.title}" returned to teacher with revision feedback.`);
+                              refresh();
+                              loadBanks();
+                            } catch (err) {
+                              setMsg(err.message || "Failed to reject question bank.");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          <X size={14} /> Reject
+                        </button>
+                      )}
+
+                      {isPublished && (
+                        <span style={{ fontSize: 12, color: "#059669", fontWeight: 600 }}>
+                          ✓ Published in Exam Catalog
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="admin-catalog-layout">
           {/* Left Column: Examination Inventory List */}
@@ -1523,6 +1797,137 @@ export function ManageExams() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {previewBank && (
+        <div className="modal-cover">
+          <div className="student-preview-modal" style={{ maxWidth: 850, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <span className="eyebrow">
+                  TEACHER SUBMISSION REVIEW · {previewBank.questions?.length || previewBank.questionCount} QUESTIONS
+                </span>
+                <h2 style={{ margin: "4px 0" }}>{previewBank.title}</h2>
+                <p className="muted" style={{ margin: 0 }}>
+                  Submitted by: {previewBank.teacherName || previewBank.createdBy} · Subject: {previewBank.subject} · Status:{" "}
+                  <span className="tag orange">{previewBank.status}</span>
+                </p>
+              </div>
+              <button className="preview-close" onClick={() => setPreviewBank(null)} aria-label="Close preview">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ maxHeight: "60vh", overflowY: "auto", paddingRight: 8 }}>
+              {(previewBank.questions || []).map((q, idx) => (
+                <article className="question-editor" key={q.id || idx} style={{ marginBottom: 14, padding: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <strong>Question {idx + 1}</strong>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {q.questionType?.replaceAll("_", " ")} · {q.difficulty}
+                    </span>
+                  </div>
+                  <p style={{ fontWeight: 600, margin: "6px 0 10px" }}>{q.text}</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {(q.options || []).map((opt, oIdx) => {
+                      const isCorrect =
+                        (q.correctOptions || []).includes(oIdx) || q.correctOption === oIdx || q.answer === oIdx;
+                      return (
+                        <div
+                          key={oIdx}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            background: isCorrect ? "#ecfdf5" : "#f8fafc",
+                            border: isCorrect ? "1.5px solid #10b981" : "1px solid #e2e8f0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 13,
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: isCorrect ? "#059669" : "#64748b" }}>
+                            {String.fromCharCode(65 + oIdx)}.
+                          </span>
+                          <span
+                            style={{
+                              color: isCorrect ? "#065f46" : "#1e293b",
+                              fontWeight: isCorrect ? 600 : 400,
+                            }}
+                          >
+                            {opt}
+                          </span>
+                          {isCorrect && (
+                            <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#059669" }}>
+                              ✓ CORRECT ANSWER
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {q.explanation && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: "#475569",
+                        background: "#f1f5f9",
+                        padding: 8,
+                        borderRadius: 6,
+                      }}
+                    >
+                      <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 18,
+                borderTop: "1px solid #e2e8f0",
+                paddingTop: 14,
+              }}
+            >
+              <button className="btn btn-outline" onClick={() => setPreviewBank(null)}>
+                Close
+              </button>
+              {previewBank.status === "submitted" && (
+                <button
+                  className="btn btn-primary"
+                  style={{ background: "#059669", borderColor: "#059669" }}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const res = await api("/admin/question-banks/publish", {
+                        method: "POST",
+                        token,
+                        body: { id: previewBank.id },
+                      });
+                      setMsg(
+                        `Question bank "${previewBank.title}" approved and published as live examination (ID: ${res.examId})!`
+                      );
+                      setPreviewBank(null);
+                      refresh();
+                      loadBanks();
+                    } catch (err) {
+                      setMsg(err.message || "Failed to approve and publish question bank.");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <CheckCircle2 size={16} /> Approve & Publish to Exams
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </Shell>

@@ -2,6 +2,7 @@ import { AdminService } from '../services/admin.service.js';
 import { ExamService } from '../services/exam.service.js';
 import { QuestionService } from '../services/question.service.js';
 import { ProctoringService } from '../services/proctoring.service.js';
+import { TeacherService } from '../services/teacher.service.js';
 import { prisma } from '../config/prisma.js';
 
 export class AdminController {
@@ -179,6 +180,24 @@ export class AdminController {
   static async approvePaper(req, res, next) {
     try {
       return res.status(200).json({ success: true, message: 'Paper approved for examination creation.' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getQuestionBanks(req, res, next) {
+    try {
+      const data = await TeacherService.getQuestionBanks(req.user?.id || 'admin-1', req.user?.role || 'ADMIN');
+      return res.status(200).json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async importQuestionBank(req, res, next) {
+    try {
+      const result = await TeacherService.importQuestionBank(req.user?.id || 'admin-1', req.body, req.user?.role || 'ADMIN');
+      return res.status(200).json(result);
     } catch (err) {
       next(err);
     }

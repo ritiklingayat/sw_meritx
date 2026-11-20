@@ -178,7 +178,7 @@ export class StudentController {
 
       const result = await WalletService.addMoney({
         userId: req.user.id,
-        amount: Number(amount || 500),
+        amount: Number(amount || 0),
         method: method || (paymentId ? `Razorpay (${paymentId})` : 'UPI Top-up')
       });
       return res.status(200).json(result);

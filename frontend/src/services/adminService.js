@@ -35,7 +35,7 @@ class AdminService {
       .map(({ password, ...student }) => {
         const studentRegistrations = registrations.filter((r) => r.studentId === student.id);
         const studentAttempts = attempts.filter((a) => a.studentId === student.id);
-        const wallet = wallets.find((w) => w.studentId === student.id) || { balance: 1500 };
+        const wallet = wallets.find((w) => w.studentId === student.id) || { balance: 0 };
         return {
           ...student,
           registeredExamsCount: studentRegistrations.length || 2,
@@ -167,11 +167,24 @@ class AdminService {
 
   async getProctoringOverview() {
     const attempts = storageService.getCollection(STORAGE_KEYS.ATTEMPTS);
+    const active = attempts.filter((a) => a.status === 'in_progress').length;
+    const flagged = attempts.filter((a) => a.isFlagged || (a.warningCount || 0) >= 3).length;
+    const withWarnings = attempts.filter((a) => (a.warningCount || 0) > 0 && (a.warningCount || 0) < 3).length;
+    const completed = attempts.filter((a) => ['submitted', 'TERMINATED', 'AUTO_SUBMITTED'].includes(a.status)).length;
+    const activeExams = new Set(attempts.filter((a) => a.status === 'in_progress').map((a) => a.examId)).size;
+
     return {
-      activeExams: 3,
-      liveCandidates: attempts.filter((a) => a.status === 'in_progress').length,
-      flaggedViolations: attempts.filter((a) => a.isFlagged || a.warningCount > 0).length,
-      terminatedExams: attempts.filter((a) => a.status === 'TERMINATED').length
+      activeExams: activeExams || 3,
+      liveCandidates: active,
+      flaggedViolations: flagged,
+      terminatedExams: attempts.filter((a) => a.status === 'TERMINATED').length,
+      activeAttemptsCount: active,
+      activeExamsCount: activeExams || 3,
+      activeCamerasCount: active,
+      interruptedCamerasCount: 0,
+      studentsWithWarningsCount: withWarnings,
+      flaggedAttemptsCount: flagged,
+      completedAttemptsCount: completed
     };
   }
 
@@ -181,20 +194,72 @@ class AdminService {
     const exams = storageService.getCollection(STORAGE_KEYS.EXAMS);
 
     return attempts.map((a) => {
-      const u = users.find((user) => user.id === a.studentId) || { name: 'Demo Candidate' };
+      const u = users.find((user) => user.id === a.studentId) || { name: 'Demo Candidate', email: 'student@meritx.demo' };
       const e = exams.find((exam) => exam.id === a.examId) || { title: 'Online Assessment' };
       return {
         attemptId: a.id,
         studentId: a.studentId,
+        studentName: u.name,
         candidateName: u.name,
+        studentEmail: u.email,
+        candidateEmail: u.email,
+        candidateCity: u.city || 'Pune',
+        examId: a.examId,
         examTitle: e.title,
         status: a.status,
+        attemptStatus: a.status,
         warningCount: a.warningCount || 0,
         isFlagged: a.isFlagged || false,
-        cameraStatus: a.proctoringStatus === 'monitored' ? 'active' : 'unmonitored',
+        cameraStatus: a.status === 'in_progress' ? 'active' : 'released',
+        micStatus: a.status === 'in_progress' ? 'active' : 'released',
+        fullscreenStatus: a.status === 'in_progress' ? 'locked' : 'exited',
+        interruptionCount: 0,
+        totalInterruptionSeconds: 0,
         startedAt: a.startedAt
       };
     });
+  }
+
+  async getProctoringTimeline(attemptId) {
+    const attempts = storageService.getCollection(STORAGE_KEYS.ATTEMPTS);
+    const users = storageService.getCollection(STORAGE_KEYS.USERS);
+    const exams = storageService.getCollection(STORAGE_KEYS.EXAMS);
+
+    const a = attempts.find((att) => att.id === attemptId) || {};
+    const u = users.find((user) => user.id === a.studentId) || { name: 'Demo Candidate', email: 'student@meritx.demo' };
+    const e = exams.find((exam) => exam.id === a.examId) || { title: 'Online Assessment' };
+
+    return {
+      attempt: {
+        id: a.id || attemptId,
+        studentId: a.studentId || 'unknown',
+        studentName: u.name,
+        candidateName: u.name,
+        studentEmail: u.email,
+        examId: a.examId || 'unknown',
+        examTitle: e.title,
+        status: a.status || 'in_progress',
+        cameraStatus: a.status === 'in_progress' ? 'active' : 'released',
+        micStatus: a.status === 'in_progress' ? 'active' : 'released',
+        fullscreenStatus: a.status === 'in_progress' ? 'locked' : 'exited',
+        warningCount: a.warningCount || 0,
+        isFlagged: Boolean(a.isFlagged),
+        consentGivenAt: a.startedAt || new Date().toISOString(),
+        verificationChecks: {
+          webcamVerified: true,
+          microphoneVerified: true,
+          screenCaptureAllowed: true,
+          singleDisplayActive: true,
+          environmentLightingOk: true
+        }
+      },
+      warnings: [],
+      events: [],
+      timeline: [
+        { time: '10:00:00 AM', type: 'info', message: 'Hardware check passed: Webcam and Audio verified.' },
+        { time: '10:00:05 AM', type: 'info', message: 'Candidate started examination in Fullscreen mode.' }
+      ]
+    };
   }
 
   resetDemoData() {

@@ -5,7 +5,7 @@ class WalletService {
    * Get student wallet, initializing a default if not found
    */
   async getWallet(studentId) {
-    if (!studentId) return { balance: 1500, availableBalance: 1500, currency: 'INR', lockedBalance: 0 };
+    if (!studentId) return { balance: 0, availableBalance: 0, currency: 'INR', lockedBalance: 0 };
 
     const wallets = storageService.getCollection(STORAGE_KEYS.WALLETS);
     let wallet = wallets.find((w) => w.studentId === studentId);
@@ -13,8 +13,8 @@ class WalletService {
     if (!wallet) {
       wallet = {
         studentId,
-        balance: 1500,
-        availableBalance: 1500,
+        balance: 0,
+        availableBalance: 0,
         currency: 'INR',
         lockedBalance: 0
       };
@@ -24,7 +24,8 @@ class WalletService {
 
     return {
       ...wallet,
-      availableBalance: wallet.balance ?? 1500
+      balance: wallet.balance ?? 0,
+      availableBalance: wallet.balance ?? 0
     };
   }
 
@@ -71,7 +72,7 @@ class WalletService {
     if (walletIndex === -1) {
       wallets.push({
         studentId,
-        balance: 1500,
+        balance: 0,
         currency: 'INR',
         lockedBalance: 0
       });
@@ -79,7 +80,7 @@ class WalletService {
     }
 
     const currentWallet = wallets[walletIndex];
-    const balanceBefore = Number(currentWallet.balance ?? 1500);
+    const balanceBefore = Number(currentWallet.balance ?? 0);
 
     if (balanceBefore < regFee) {
       return {
@@ -157,8 +158,8 @@ class WalletService {
    */
   async addMoney({ studentId, studentName = '', amount = 500, method = 'UPI / Instant Demo Top-Up' }) {
     const numAmount = Number(amount);
-    if (!studentId || isNaN(numAmount) || numAmount <= 0) {
-      throw new Error('Valid student ID and positive deposit amount are required.');
+    if (!studentId || isNaN(numAmount) || numAmount < 1 || numAmount > 1000) {
+      throw new Error('Deposit amount must be between ₹1 and ₹1,000.');
     }
 
     const wallets = storageService.getCollection(STORAGE_KEYS.WALLETS);
@@ -167,7 +168,7 @@ class WalletService {
     if (walletIndex === -1) {
       wallets.push({
         studentId,
-        balance: 1500,
+        balance: 0,
         currency: 'INR',
         lockedBalance: 0
       });
@@ -175,7 +176,7 @@ class WalletService {
     }
 
     const currentWallet = wallets[walletIndex];
-    const balanceBefore = Number(currentWallet.balance ?? 1500);
+    const balanceBefore = Number(currentWallet.balance ?? 0);
     const balanceAfter = balanceBefore + numAmount;
     currentWallet.balance = balanceAfter;
     storageService.set(STORAGE_KEYS.WALLETS, wallets);
@@ -224,7 +225,7 @@ class WalletService {
     if (walletIndex === -1) {
       wallets.push({
         studentId,
-        balance: 1500,
+        balance: 0,
         currency: 'INR',
         lockedBalance: 0
       });
@@ -232,7 +233,7 @@ class WalletService {
     }
 
     const currentWallet = wallets[walletIndex];
-    const balanceBefore = Number(currentWallet.balance ?? 1500);
+    const balanceBefore = Number(currentWallet.balance ?? 0);
 
     if (balanceBefore < numAmount) {
       return {
