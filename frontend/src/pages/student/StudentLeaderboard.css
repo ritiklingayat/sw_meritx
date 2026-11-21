@@ -448,3 +448,45 @@
   color: #2563eb;
   font-size: 14px;
 }
+
+/* ==========================================================================
+   Mobile Responsive Adjustments for Student Leaderboard
+   ========================================================================== */
+@media (max-width: 768px) {
+  .leaderboard-controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+    gap: 12px;
+  }
+  .exam-selector-wrap {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .exam-select-dropdown {
+    min-width: 0;
+    width: 100%;
+  }
+  .candidate-rank-banner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px 16px;
+    gap: 16px;
+  }
+  .candidate-rank-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .rank-title {
+    font-size: 17px;
+  }
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}

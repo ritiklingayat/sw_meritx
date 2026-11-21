@@ -643,3 +643,52 @@
 .status-flagged { background: #fee2e2; color: #b91c1c; }
 .status-reversed { background: #f3e8ff; color: #7e22ce; }
 
+/* ==========================================================================
+   Mobile Responsive Adjustments for Superadmin Finance
+   ========================================================================== */
+@media (max-width: 768px) {
+  .finance-tabs-nav {
+    gap: 4px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .finance-tab-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .reconciliation-grid {
+    grid-template-columns: 1fr;
+  }
+  .allocation-legends {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .student-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 20px 20px 0 0;
+    margin: 0;
+  }
+  .student-modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .finance-notice {
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 12px;
+  }
+  .reconciliation-panel {
+    padding: 16px 12px;
+  }
+  .reconciliation-card {
+    padding: 14px;
+  }
+  .calc-breakdown-box {
+    padding: 12px;
+  }
+}
+

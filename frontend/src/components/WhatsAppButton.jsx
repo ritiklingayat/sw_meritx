@@ -1,9 +1,13 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { buildWhatsAppUrl } from '../config/public';
 import './WhatsAppButton.css';
 
 export default function WhatsAppButton() {
+  const location = useLocation();
+  if (location.pathname.startsWith('/take/')) return null;
+
   const message = String(import.meta.env.VITE_WHATSAPP_MESSAGE || 'Hello MERITX, I would like to know more about your subjects and exams.');
   const href = buildWhatsAppUrl(import.meta.env.VITE_WHATSAPP_NUMBER, message);
   if (!href) return null;

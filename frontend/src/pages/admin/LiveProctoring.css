@@ -318,3 +318,63 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   Mobile Responsive Adjustments for Live Proctoring
+   ========================================================================== */
+@media (max-width: 768px) {
+  .proctor-filters-row {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+  .proctor-select {
+    width: 100%;
+  }
+  .proctor-autorefresh-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .proctor-dossier-card {
+    max-width: 100%;
+    width: 100%;
+    padding: 18px 14px;
+    border-radius: 16px;
+  }
+  .proctor-modal-strip {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 12px;
+    gap: 10px;
+  }
+  .verification-checklist-grid {
+    grid-template-columns: 1fr;
+  }
+  .timeline-entry {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .proctor-modal-strip {
+    grid-template-columns: 1fr;
+  }
+  .event-stream-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .event-detail {
+    white-space: normal;
+    word-break: break-all;
+    width: 100%;
+  }
+  .candidate-cell {
+    gap: 8px;
+  }
+  .candidate-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+}

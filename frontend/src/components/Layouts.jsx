@@ -236,16 +236,15 @@ export function Shell({ children, title, kicker, description, action }) {
               <small>{user?.role}</small>
             </div>
             <button
-              className="btn btn-outline small"
+              className="btn btn-outline small topbar-signout-btn"
               onClick={() => {
                 logout();
                 nav("/");
               }}
               title="Sign out of your workspace"
-              style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 10, padding: "7px 12px", color: "#e05d69", borderColor: "#fecdd3" }}
             >
               <LogOut size={14} />
-              <span>Sign out</span>
+              <span className="topbar-signout-text">Sign out</span>
             </button>
           </div>
         </header>
@@ -256,7 +255,7 @@ export function Shell({ children, title, kicker, description, action }) {
               <h1>{title}</h1>
               {description && <p>{description}</p>}
             </div>
-            {action}
+            {action && <div className="page-action">{action}</div>}
           </div>
           {children}
         </main>

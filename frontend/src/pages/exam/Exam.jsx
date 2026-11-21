@@ -73,6 +73,7 @@ export default function Exam() {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState("Auto-saved");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
 
   // Pre-exam hardware verification states
   const [cameraStatus, setCameraStatus] = useState("pending"); // "pending" | "active" | "denied" | "simulated"
@@ -608,6 +609,7 @@ export default function Exam() {
     if (!visited.includes(targetIndex)) {
       setVisited((prev) => [...prev, targetIndex]);
     }
+    setMobilePaletteOpen(false);
   };
 
   // Save & Next
@@ -1287,10 +1289,22 @@ export default function Exam() {
             </div>
           </div>
 
+          {/* Mobile Palette Toggle */}
+          <button
+            type="button"
+            className="btn-header-action mobile-palette-btn"
+            onClick={() => setMobilePaletteOpen(!mobilePaletteOpen)}
+            title="Question Palette"
+            aria-label="Open Question Palette"
+          >
+            <Layers size={17} />
+            <span className="mobile-palette-btn-count">{answeredCount}/{questions.length}</span>
+          </button>
+
           {/* Fullscreen Toggle */}
           <button
             type="button"
-            className="btn-header-action"
+            className="btn-header-action btn-fullscreen-toggle"
             onClick={toggleFullscreen}
             title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
           >
@@ -1303,7 +1317,7 @@ export default function Exam() {
             className="btn btn-primary btn-submit-exam"
             onClick={() => setConfirm(true)}
           >
-            Submit Exam <Send size={14} />
+            <span>Submit Exam</span> <Send size={14} />
           </button>
         </div>
       </header>
@@ -1400,8 +1414,31 @@ export default function Exam() {
           </footer>
         </section>
 
+        {/* MOBILE PALETTE BACKDROP */}
+        {mobilePaletteOpen && (
+          <div
+            className="mobile-palette-backdrop"
+            onClick={() => setMobilePaletteOpen(false)}
+          />
+        )}
+
         {/* RIGHT SIDEBAR: PROCTORING HUD & QUESTION PALETTE */}
-        <aside className="station-sidebar" aria-label="Question Palette & Proctoring">
+        <aside
+          className={`station-sidebar ${mobilePaletteOpen ? "mobile-open" : ""}`}
+          aria-label="Question Palette & Proctoring"
+        >
+          {/* Mobile Palette Close Strip */}
+          <div className="mobile-palette-header">
+            <h4>Question Palette ({answeredCount}/{questions.length})</h4>
+            <button
+              type="button"
+              className="btn-palette-close"
+              onClick={() => setMobilePaletteOpen(false)}
+              aria-label="Close question palette"
+            >
+              <X size={18} />
+            </button>
+          </div>
           {/* Proctoring Thumbnail HUD */}
           <div className="proctoring-hud-card">
             <div className="hud-video-frame">
