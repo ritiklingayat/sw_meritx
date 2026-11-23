@@ -107,10 +107,10 @@ export function SiteHeader() {
           ) : (
             <>
               <Link className="subtle-link" to="/login">
-                Log In
+                Student Login
               </Link>
               <Link className="btn btn-primary small" to="/register">
-                Start Learning <ArrowUpRight size={15} />
+                Student Registration <ArrowUpRight size={15} />
               </Link>
             </>
           )}
@@ -143,7 +143,8 @@ export function SiteFooter() {
             <a href="/#subjects">Subjects</a>
             <a href="/#about">About Us</a>
             <a href="/#contact">Contact</a>
-            <Link to="/login">Demo Login</Link>
+            <Link to="/login">Student Login</Link>
+            <Link to="/register">Student Registration</Link>
           </div>
         </div>
         <div className="footer-bottom">

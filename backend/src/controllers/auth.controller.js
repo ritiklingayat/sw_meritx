@@ -13,8 +13,9 @@ export class AuthController {
 
   static async login(req, res, next) {
     try {
-      const { email, password } = req.body;
-      const result = await AuthService.login(email, password);
+      const identifier = req.body.username || req.body.email || req.body.identifier;
+      const { password, role } = req.body;
+      const result = await AuthService.login(identifier, password, role);
       return successResponse(res, result, 'Login successful');
     } catch (err) {
       next(err);
@@ -62,7 +63,8 @@ export class AuthController {
 
   static async forgotPassword(req, res, next) {
     try {
-      return successResponse(res, { message: 'Password reset link sent if account exists.' });
+      const target = req.body.email || req.body.username || req.body.identifier;
+      return successResponse(res, { message: target ? `Password reset link sent to registered email for '${target}'.` : 'Password reset link sent if account exists.' });
     } catch (err) {
       next(err);
     }

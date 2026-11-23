@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,12 +8,16 @@ import {
   BrainCircuit,
   CheckCircle2,
   ChevronDown,
+  Eye,
+  EyeOff,
   FlaskConical,
   GraduationCap,
   LineChart,
+  Lock,
   ShieldCheck,
   Target,
   Trophy,
+  User,
 } from "lucide-react";
 import { SiteFooter, SiteHeader } from "../../components/Layouts";
 import { useAuth } from "../../context/AuthContext";
@@ -60,12 +64,24 @@ const features = [
 ];
 
 export default function Home() {
-  const { token } = useAuth();
+  const { user, token, login, logout } = useAuth();
+  const nav = useNavigate();
   const [active, setActive] = useState(0);
   const [exams, setExams] = useState([]);
   const [landing, setLanding] = useState(null);
   const touchStart = useRef(null);
   const change = (next) => setActive((next + slides.length) % slides.length);
+
+  // Student Authentication on Home Page state
+  const [authTab, setAuthTab] = useState("login"); // 'login' or 'register'
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authTarget, setAuthTarget] = useState("JEE Main");
+  const [authShowPass, setAuthShowPass] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
@@ -76,10 +92,65 @@ export default function Home() {
     );
     return () => window.clearInterval(timer);
   }, []);
+
   useEffect(() => {
-    api('/exams', { token }).then((examData) => setExams(examData?.exams || [])).catch(() => {});
-    api('/landing-content').then((contentData) => setLanding(contentData?.content?.about_courses || null)).catch(() => {});
+    api("/exams", { token })
+      .then((examData) => setExams(examData?.exams || []))
+      .catch(() => {});
+    api("/landing-content")
+      .then((contentData) =>
+        setLanding(contentData?.content?.about_courses || null),
+      )
+      .catch(() => {});
   }, [token]);
+
+  const handleHomeStudentLogin = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthNotice("");
+    setAuthBusy(true);
+    try {
+      const u = await login(authEmail, authPassword, "student");
+      if (u?.role !== "student") {
+        logout();
+        setAuthError(
+          "Access denied: This login is strictly for students. Teachers and Administrators must use their dedicated login portals.",
+        );
+        return;
+      }
+      nav("/student");
+    } catch (err) {
+      setAuthError(err.message || "Invalid student credentials.");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleHomeStudentRegister = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthNotice("");
+    setAuthBusy(true);
+    try {
+      await api("/auth/register", {
+        method: "POST",
+        body: {
+          name: authName,
+          email: authEmail,
+          password: authPassword,
+          target: authTarget,
+          role: "student",
+        },
+      });
+      // Automatically log the new student in
+      const u = await login(authEmail, authPassword, "student");
+      nav("/student");
+    } catch (err) {
+      setAuthError(err.message || "Failed to create student account.");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   const slide = slides[active];
   return (
@@ -146,7 +217,11 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="category-strip" id="subjects" aria-label="Available subjects">
+        <section
+          className="category-strip"
+          id="subjects"
+          aria-label="Available subjects"
+        >
           <div className="container category-grid">
             {[
               [GraduationCap, "Physics"],
@@ -175,7 +250,8 @@ export default function Home() {
                 <span className="section-kicker">SUBJECT-BASED PRACTICE</span>
                 <h2>Choose your next challenge</h2>
                 <p>
-                  Practice Physics, Chemistry, Mathematics, and Biology in the available Meritx exams.
+                  Practice Physics, Chemistry, Mathematics, and Biology in the
+                  available Meritx exams.
                 </p>
               </div>
               <Link className="section-link" to="/exams">
@@ -183,12 +259,33 @@ export default function Home() {
               </Link>
             </div>
             <div className="home-course-grid">
-              {exams.slice(0, 4).map((exam) => <ExamCard key={exam.id} exam={exam} />)}
+              {exams
+                .slice(0, 4)
+                .map((exam) => (
+                  <ExamCard key={exam.id} exam={exam} />
+                ))}
             </div>
           </div>
         </section>
 
-        {landing?.visible !== false && <section className="home-section about-courses"><div className="container"><div className="panel"><span className="section-kicker">MERITX EXAMINATIONS</span><h2>{landing?.heading || 'About Our Examinations'}</h2><p>{landing?.description || 'Structured mock examinations for your target entrance test.'}</p><Link className="btn btn-primary" to="/exams">{landing?.buttonLabel || 'Explore examinations'} <ArrowRight size={16}/></Link></div></div></section>}
+        {landing?.visible !== false && (
+          <section className="home-section about-courses">
+            <div className="container">
+              <div className="panel">
+                <span className="section-kicker">MERITX EXAMINATIONS</span>
+                <h2>{landing?.heading || "About Our Examinations"}</h2>
+                <p>
+                  {landing?.description ||
+                    "Structured mock examinations for your target entrance test."}
+                </p>
+                <Link className="btn btn-primary" to="/exams">
+                  {landing?.buttonLabel || "Explore examinations"}{" "}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="home-section benefits-section" id="about">
           <div className="container">
@@ -216,13 +313,206 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Student Portal Quick Authentication Section (Student Only) */}
+        <section className="home-auth-section" id="student-portal">
+          <div className="container">
+            <div className="section-heading centered" style={{ marginBottom: "28px" }}>
+              <div>
+                <span className="section-kicker">STUDENT WORKSPACE ACCESS</span>
+                <h2>Start Your Preparation Journey</h2>
+                <p>
+                  Access authentic timed mock tests, question-wise analytics, and performance reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="home-auth-card">
+              {user ? (
+                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background: "#e0e7ff",
+                      color: "#3730a3",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                      fontSize: "22px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {user?.name?.charAt(0) || "S"}
+                  </div>
+                  <h3 style={{ margin: "0 0 6px", fontSize: "20px", color: "#1e293b" }}>
+                    Signed in as {user?.name}
+                  </h3>
+                  <p style={{ margin: "0 0 20px", fontSize: "13px", color: "#64748b" }}>
+                    Role: <strong style={{ textTransform: "capitalize" }}>{user?.role}</strong> · {user?.email}
+                  </p>
+                  <Link
+                    to={user.role === "student" ? "/student" : "/" + user.role}
+                    className="btn btn-primary"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                  >
+                    Open Dashboard <ArrowRight size={16} />
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="home-auth-tabs">
+                    <button
+                      type="button"
+                      className={`home-auth-tab ${authTab === "login" ? "active" : ""}`}
+                      onClick={() => {
+                        setAuthTab("login");
+                        setAuthError("");
+                        setAuthNotice("");
+                      }}
+                    >
+                      <User size={15} /> Student Login
+                    </button>
+                    <button
+                      type="button"
+                      className={`home-auth-tab ${authTab === "register" ? "active" : ""}`}
+                      onClick={() => {
+                        setAuthTab("register");
+                        setAuthError("");
+                        setAuthNotice("");
+                      }}
+                    >
+                      <GraduationCap size={15} /> Create Student Account
+                    </button>
+                  </div>
+
+                  {authNotice && <div className="alert success">{authNotice}</div>}
+                  {authError && <div className="alert error">{authError}</div>}
+
+                  {authTab === "login" ? (
+                    <form onSubmit={handleHomeStudentLogin}>
+                      <div className="field">
+                        <label>Student Email Address</label>
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          placeholder="student@example.com"
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Password</label>
+                        <div className="password-wrap">
+                          <input
+                            type={authShowPass ? "text" : "password"}
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="Enter password"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAuthShowPass(!authShowPass)}
+                            aria-label={authShowPass ? "Hide password" : "Show password"}
+                          >
+                            {authShowPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary home-auth-submit"
+                        disabled={authBusy}
+                      >
+                        {authBusy ? "Signing in..." : "Sign In as Student"}{" "}
+                        <ArrowRight size={16} />
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleHomeStudentRegister}>
+                      <div className="field">
+                        <label>Full Name</label>
+                        <input
+                          type="text"
+                          value={authName}
+                          onChange={(e) => setAuthName(e.target.value)}
+                          placeholder="Your full name"
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Student Email Address</label>
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          placeholder="student@example.com"
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Create Password</label>
+                        <div className="password-wrap">
+                          <input
+                            type={authShowPass ? "text" : "password"}
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="At least 8 characters"
+                            minLength={8}
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAuthShowPass(!authShowPass)}
+                            aria-label={authShowPass ? "Hide password" : "Show password"}
+                          >
+                            {authShowPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="field">
+                        <label>Target Examination</label>
+                        <select
+                          value={authTarget}
+                          onChange={(e) => setAuthTarget(e.target.value)}
+                        >
+                          <option>JEE Main</option>
+                          <option>JEE Advanced</option>
+                          <option>NEET UG</option>
+                          <option>MHT-CET</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary home-auth-submit"
+                        disabled={authBusy}
+                      >
+                        {authBusy ? "Creating account..." : "Register Student Account"}{" "}
+                        <ArrowRight size={16} />
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section className="learning-band">
           <div className="container learning-band-grid">
             <div>
               <span className="section-kicker light">LEARN ANYWHERE</span>
               <h2>Your preparation space, always within reach.</h2>
               <p>
-                Browse subjects, use demo accounts, attempt the existing sample
+                Browse subjects, register as a student, attempt realistic sample
                 exams, and review your progress across sessions.
               </p>
               <div className="band-checks">
@@ -234,7 +524,7 @@ export default function Home() {
                 </span>
               </div>
               <Link className="btn btn-light" to="/register">
-                Create your profile <ArrowUpRight size={16} />
+                Create Student Account <ArrowUpRight size={16} />
               </Link>
             </div>
             <div className="device-art" aria-hidden="true">
@@ -274,12 +564,11 @@ export default function Home() {
               <span className="section-kicker">GOOD TO KNOW</span>
               <h2>Built as a transparent learning demo.</h2>
               <p>
-                Profiles and practice progress are stored in the configured
-                MERITX database. Payments, live ranking, and payouts are not
-                enabled.
+                Student profiles and practice progress are stored in the configured
+                MERITX database. Payments, live ranking, and payouts are illustrative.
               </p>
               <Link className="section-link" to="/login">
-                Explore a demo account <ArrowRight size={16} />
+                Student Login <ArrowRight size={16} />
               </Link>
             </div>
             <div className="faq-list">
@@ -295,7 +584,7 @@ export default function Home() {
                   </summary>
                   <p>
                     {index === 0
-                      ? "Your account, registrations, attempts, and support requests are stored by the secure MERITX API."
+                      ? "Your student account, registrations, attempts, and support requests are stored by the secure MERITX API."
                       : index === 1
                         ? "No. Any fee or prize information belongs to the original demo data and is clearly presented as illustrative."
                         : "Yes. Use the student demo account, register for an exam, and complete the sample test."}

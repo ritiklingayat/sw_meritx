@@ -12,6 +12,8 @@ import Home from "./pages/public/Home";
 import Exams from "./pages/public/Exams";
 import ExamDetails from "./pages/public/ExamDetails";
 import Auth from "./pages/auth/Auth";
+import TeacherLogin from "./pages/auth/TeacherLogin";
+import AdminLogin from "./pages/auth/AdminLogin";
 import Exam from "./pages/exam/Exam";
 import DashboardExplore from "./pages/common/Explore";
 import StudentLeaderboard from "./pages/student/StudentLeaderboard";
@@ -68,13 +70,49 @@ import LiveProctoringDashboard from "./pages/admin/LiveProctoring";
 function Protected({ role, children }) {
   const { user } = useAuth(),
     location = useLocation();
-  if (!user)
+  if (!user) {
+    if (role === "teacher" || location.pathname.startsWith("/teacher")) {
+      return <Navigate to="/teacher" state={{ from: location.pathname }} replace />;
+    }
+    if (
+      role === "admin" ||
+      role === "superadmin" ||
+      location.pathname.startsWith("/admin") ||
+      location.pathname.startsWith("/superadmin")
+    ) {
+      return <Navigate to="/admin" state={{ from: location.pathname }} replace />;
+    }
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
   const userRole = String(user.role || "").toLowerCase();
   const targetRole = String(role || "").toLowerCase();
   if (userRole !== targetRole && !(targetRole === "admin" && userRole === "superadmin"))
     return <Navigate to={"/" + userRole} replace />;
   return children;
+}
+
+function TeacherRoute() {
+  const { user } = useAuth();
+  if (!user) {
+    return <TeacherLogin />;
+  }
+  const userRole = String(user.role || "").toLowerCase();
+  if (userRole === "teacher") {
+    return <TeacherDashboard />;
+  }
+  return <Navigate to={"/" + userRole} replace />;
+}
+
+function AdminRoute() {
+  const { user } = useAuth();
+  if (!user) {
+    return <AdminLogin />;
+  }
+  const userRole = String(user.role || "").toLowerCase();
+  if (userRole === "admin" || userRole === "superadmin") {
+    return <AdminDashboard />;
+  }
+  return <Navigate to={"/" + userRole} replace />;
 }
 
 const protect = (role, Component) => (
@@ -167,8 +205,10 @@ export default function App() {
           <Route path="/take/:id" element={protect("student", Exam)} />
 
           {/* Teacher Routes */}
+          <Route path="/teacher" element={<TeacherRoute />} />
+          <Route path="/teacher/login" element={<TeacherLogin />} />
           <Route
-            path="/teacher"
+            path="/teacher/dashboard"
             element={protect("teacher", TeacherDashboard)}
           />
           <Route
@@ -197,7 +237,9 @@ export default function App() {
           />
 
           {/* Admin Routes */}
-          <Route path="/admin" element={protect("admin", AdminDashboard)} />
+          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={protect("admin", AdminDashboard)} />
           <Route
             path="/admin/finance"
             element={protect("admin", FinanceDashboard)}

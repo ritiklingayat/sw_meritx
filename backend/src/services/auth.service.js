@@ -108,29 +108,53 @@ export class AuthService {
     };
   }
 
-  static async login(email, password) {
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const user = await prisma.user.findUnique({
-      where: { email: cleanEmail },
+  static async login(identifier, password, requiredRole = null) {
+    const cleanId = String(identifier || '').trim();
+    const cleanLower = cleanId.toLowerCase();
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: cleanLower },
+          { id: cleanId },
+          { name: { equals: cleanId, mode: 'insensitive' } },
+          { email: { startsWith: cleanLower + '@', mode: 'insensitive' } }
+        ]
+      },
       include: { profile: true, wallet: true }
     });
 
     if (!user) {
-      throw new UnauthorizedError('Invalid email or password.');
+      throw new UnauthorizedError('Invalid credentials. Account not found.');
     }
 
     if (!user.isActive) {
       throw new UnauthorizedError('Account has been deactivated. Please contact support.');
     }
 
+    // Role enforcement if requested
+    if (requiredRole) {
+      const userRole = String(user.role).toLowerCase();
+      const targetRole = String(requiredRole).toLowerCase();
+      if (targetRole === 'teacher' && userRole !== 'teacher') {
+        throw new UnauthorizedError('Access denied: Only authorized teachers can log in through this portal.');
+      }
+      if (targetRole === 'admin' && userRole !== 'admin' && userRole !== 'superadmin') {
+        throw new UnauthorizedError('Access denied: Only authorized administrators can log in through this portal.');
+      }
+      if (targetRole === 'student' && userRole !== 'student') {
+        throw new UnauthorizedError('Access denied: Only students can log in through this portal.');
+      }
+    }
+
     // Demo accounts fallback if password hash missing
     if (user.passwordHash) {
       const isMatch = await bcrypt.compare(password, user.passwordHash);
       if (!isMatch) {
-        throw new UnauthorizedError('Invalid email or password.');
+        throw new UnauthorizedError('Invalid credentials. Incorrect password.');
       }
     } else if (password !== 'Student@123' && password !== 'Admin@123' && password !== 'Teacher@123' && password !== 'Super@123') {
-      throw new UnauthorizedError('Invalid email or password.');
+      throw new UnauthorizedError('Invalid credentials. Incorrect password.');
     }
 
     if (!user.wallet) {

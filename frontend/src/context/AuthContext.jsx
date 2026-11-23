@@ -51,12 +51,18 @@ export function AuthProvider({ children }) {
         }
       });
   }, [token]);
-  const login = async (email, password) => {
+  const login = async (identifier, password, role = null) => {
     setLoading(true);
     try {
+      const body = {
+        email: identifier,
+        username: identifier,
+        password,
+      };
+      if (role) body.role = role;
       const data = await api("/auth/login", {
         method: "POST",
-        body: { email, password },
+        body,
       });
       const normUser = normalizeUser(data.user);
       setToken(data.token);

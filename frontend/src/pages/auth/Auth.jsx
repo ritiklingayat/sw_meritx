@@ -1,30 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, ShieldCheck, Eye, EyeOff, User, GraduationCap, Shield } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ShieldCheck, Eye, EyeOff, User, GraduationCap } from 'lucide-react';
 import Brand from '../../components/Brand';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import './Auth.css';
 
-const demos = [
-  ['Student', 'student@meritx.demo', 'Student@123'],
-  ['Teacher', 'teacher@meritx.demo', 'Teacher@123'],
-  ['Admin', 'admin@meritx.demo', 'Admin@123'],
-  ['Super Admin', 'superadmin@meritx.demo', 'Super@123'],
-];
-
 export default function Auth({ register = false }) {
-  const { login, googleLogin, loading } = useAuth();
+  const { login, logout, googleLogin, loading } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const googleBox = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('student');
   const [target, setTarget] = useState('JEE Main');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState(location.state?.registered ? 'Registration successful! Please sign in to your workspace.' : '');
+  const [notice, setNotice] = useState(location.state?.registered ? 'Registration successful! Please sign in to your student workspace.' : '');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -42,7 +34,12 @@ export default function Auth({ register = false }) {
           setError('');
           try {
             const user = await googleLogin(credential, target);
-            nav('/' + String(user?.role || 'student').toLowerCase());
+            if (user?.role !== 'student') {
+              logout();
+              setError('Access denied: Google sign-in is reserved for student accounts.');
+              return;
+            }
+            nav('/student');
           } catch (issue) {
             setError(issue.message);
           } finally {
@@ -70,7 +67,7 @@ export default function Auth({ register = false }) {
     return () => {
       cancelled = true;
     };
-  }, [googleClientId, googleLogin, target, register, nav]);
+  }, [googleClientId, googleLogin, target, register, nav, logout]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -81,12 +78,17 @@ export default function Auth({ register = false }) {
       if (register) {
         await api('/auth/register', {
           method: 'POST',
-          body: { name, email, password, target, role },
+          body: { name, email, password, target, role: 'student' },
         });
         nav('/login', { state: { registered: true } });
       } else {
-        const u = await login(email, password);
-        nav('/' + String(u?.role || 'student').toLowerCase());
+        const u = await login(email, password, 'student');
+        if (u?.role !== 'student') {
+          logout();
+          setError('Access denied: This portal is strictly for students. Teachers and Administrators must use their dedicated login portals.');
+          return;
+        }
+        nav('/student');
       }
     } catch (e) {
       setError(e.message);
@@ -102,7 +104,7 @@ export default function Auth({ register = false }) {
           <Brand />
         </Link>
         <div className="auth-message">
-          <div className="auth-kicker">THE MERITX EXPERIENCE</div>
+          <div className="auth-kicker">STUDENT WORKSPACE</div>
           <h1>
             The next big
             <br />
@@ -125,12 +127,12 @@ export default function Auth({ register = false }) {
           <Link to="/" className="auth-back">
             ← Back to website
           </Link>
-          <span className="eyebrow">WELCOME TO MERITX</span>
-          <h2>{register ? 'Create your account' : 'Welcome back'}</h2>
+          <span className="eyebrow">STUDENT PORTAL</span>
+          <h2>{register ? 'Create Student Account' : 'Student Sign In'}</h2>
           <p className="auth-sub">
             {register
-              ? 'Join as a Student, Teacher, or Administrator.'
-              : 'Enter your credentials to access your secure MERITX workspace.'}
+              ? 'Join MERITX to access mock examinations, live tests, and performance analytics.'
+              : 'Enter your student credentials to access your secure MERITX workspace.'}
           </p>
 
           {notice && <div className="alert success">{notice}</div>}
@@ -138,56 +140,24 @@ export default function Auth({ register = false }) {
 
           <form onSubmit={submit}>
             {register && (
-              <>
-                <div className="field">
-                  <label>I am registering as</label>
-                  <div className="role-selector" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                    <button
-                      type="button"
-                      className={`btn ${role === 'student' ? 'btn-primary' : 'btn-soft'}`}
-                      style={{ padding: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      onClick={() => setRole('student')}
-                    >
-                      <User size={15} /> Student
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn ${role === 'teacher' ? 'btn-primary' : 'btn-soft'}`}
-                      style={{ padding: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      onClick={() => setRole('teacher')}
-                    >
-                      <GraduationCap size={15} /> Teacher
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn ${role === 'admin' ? 'btn-primary' : 'btn-soft'}`}
-                      style={{ padding: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      onClick={() => setRole('admin')}
-                    >
-                      <Shield size={15} /> Admin
-                    </button>
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label>Full Name</label>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your full name"
-                    required
-                  />
-                </div>
-              </>
+              <div className="field">
+                <label>Full Name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
             )}
 
             <div className="field">
-              <label>Email address</label>
+              <label>Student Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="yourname@example.com"
+                placeholder="student@example.com"
                 required
               />
             </div>
@@ -213,7 +183,7 @@ export default function Auth({ register = false }) {
               </div>
             </div>
 
-            {register && role === 'student' && (
+            {register && (
               <div className="field">
                 <label>Target Examination</label>
                 <select value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -226,7 +196,7 @@ export default function Auth({ register = false }) {
             )}
 
             <button className="btn btn-primary auth-submit" disabled={loading || busy}>
-              {busy ? (register ? 'Creating account...' : 'Signing in...') : register ? 'Create Account' : 'Sign In'}{' '}
+              {busy ? (register ? 'Creating account...' : 'Signing in...') : register ? 'Create Student Account' : 'Sign In as Student'}{' '}
               <ArrowRight size={17} />
             </button>
           </form>
@@ -241,36 +211,9 @@ export default function Auth({ register = false }) {
           )}
 
           <p className="switch-auth">
-            {register ? 'Already have an account?' : 'New to Meritx?'}{' '}
-            <Link to={register ? '/login' : '/register'}>{register ? 'Log in' : 'Create an account'}</Link>
+            {register ? 'Already have a student account?' : 'New student on Meritx?'}{' '}
+            <Link to={register ? '/login' : '/register'}>{register ? 'Sign In' : 'Create an account'}</Link>
           </p>
-
-          {!register && (
-            <div className="demo-login">
-              <div className="demo-head">
-                <ShieldCheck size={17} />
-                <div>
-                  <strong>Explore demo accounts</strong>
-                  <small>Click any account to fill credentials</small>
-                </div>
-              </div>
-              <div className="demo-accounts">
-                {demos.map(([roleLabel, e, p]) => (
-                  <button
-                    type="button"
-                    key={roleLabel}
-                    onClick={() => {
-                      setEmail(e);
-                      setPassword(p);
-                      setError('');
-                    }}
-                  >
-                    {roleLabel} <ArrowRight size={13} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
