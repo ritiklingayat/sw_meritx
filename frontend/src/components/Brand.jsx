@@ -19,7 +19,7 @@ export default function Brand({ compact = false, full = false }) {
       </div>
       <div className="brand-words">
         <span>Merit<span>x</span></span>
-        {!compact && <small>LEARN · PRACTICE · RISE</small>}
+        {!compact && <small>Ritik· PRACTICE · RISE</small>}
       </div>
     </div>
   );
