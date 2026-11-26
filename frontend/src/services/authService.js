@@ -27,31 +27,6 @@ class AuthService {
     return { user: safeUser, token };
   }
 
-  async googleLogin(credential, target = 'JEE Main') {
-    const users = storageService.getCollection(STORAGE_KEYS.USERS);
-    // Find or create student
-    let user = users.find((u) => u.role === 'student');
-    if (!user) {
-      user = storageService.insert(STORAGE_KEYS.USERS, {
-        name: 'Google Candidate',
-        email: 'google.student@meritx.demo',
-        role: 'student',
-        target,
-        city: 'Delhi',
-        year: '2027'
-      });
-    }
-
-    const token = `demo-google-token-${user.id}`;
-    const safeUser = { ...user };
-    delete safeUser.password;
-
-    sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-    sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(safeUser));
-
-    return { user: safeUser, token };
-  }
-
   async register({ name, email, password, target = 'JEE Main', role = 'student', city = 'Pune', year = '2027' }) {
     const users = storageService.getCollection(STORAGE_KEYS.USERS);
     const cleanEmail = String(email || '').trim().toLowerCase();

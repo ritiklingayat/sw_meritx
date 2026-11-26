@@ -29,7 +29,7 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/ap
  * Includes graceful local fallback if the backend server is unreachable.
  */
 export async function api(path, { method = 'GET', body, token, headers = {} } = {}) {
-  const authToken = token || sessionStorage.getItem('meritx_token') || '';
+  const authToken = token || sessionStorage.getItem('meritx_token') || localStorage.getItem('meritx_token') || '';
 
   // Clean path formatting
   let cleanPath = path.startsWith('/') ? path : `/${path}`;
@@ -60,6 +60,8 @@ export async function api(path, { method = 'GET', body, token, headers = {} } = 
       if (cleanPath.includes('/auth/me')) {
         sessionStorage.removeItem('meritx_token');
         sessionStorage.removeItem('meritx_user');
+        localStorage.removeItem('meritx_token');
+        localStorage.removeItem('meritx_user');
       }
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.message || 'Unauthenticated. Please log in.');
@@ -116,13 +118,8 @@ async function localFallbackRouter(path, { method = 'GET', body, token } = {}) {
     return authService.login(body?.email, body?.password);
   }
 
-  if (cleanPath === '/auth/google' && m === 'POST') {
-    return authService.googleLogin(body?.credential, body?.target);
-  }
-
-  if (cleanPath === '/auth/register' && m === 'POST') {
-    const newUser = await authService.register(body || {});
-    return { user: newUser, token: `demo-token-${newUser.id}` };
+  if (cleanPath.startsWith('/auth/student/') || cleanPath === '/auth/register') {
+    throw new Error('Unable to reach the authentication server. Email OTP verification and registration require a live backend connection.');
   }
 
   if (cleanPath === '/auth/me') {

@@ -24,9 +24,61 @@ export class AuthController {
 
   static async google(req, res, next) {
     try {
-      const { credential, target } = req.body;
-      const result = await AuthService.googleLogin(credential, target);
-      return successResponse(res, result, 'Google login successful');
+      const result = await AuthService.googleLogin();
+      return successResponse(res, result, 'Google login');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async studentSendOtp(req, res, next) {
+    try {
+      const { name, email, target, purpose = 'registration' } = req.body;
+      let result;
+      if (purpose === 'password_reset') {
+        result = await AuthService.initiateStudentPasswordResetOtp({ email });
+      } else {
+        result = await AuthService.initiateStudentRegistrationOtp({ name, email, target });
+      }
+      return successResponse(res, result, result.message);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async studentVerifyOtp(req, res, next) {
+    try {
+      const { email, otp, purpose } = req.body;
+      const result = await AuthService.verifyStudentOtp({ email, otp, purpose });
+      return successResponse(res, result, result.message);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async studentResendOtp(req, res, next) {
+    try {
+      const { email, purpose } = req.body;
+      const result = await AuthService.resendStudentOtp({ email, purpose });
+      return successResponse(res, result, result.message);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async studentCompleteRegistration(req, res, next) {
+    try {
+      const result = await AuthService.completeStudentRegistration(req.body);
+      return successResponse(res, result, 'Student account registration completed successfully.', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async studentResetPassword(req, res, next) {
+    try {
+      const result = await AuthService.resetStudentPassword(req.body);
+      return successResponse(res, result, result.message);
     } catch (err) {
       next(err);
     }

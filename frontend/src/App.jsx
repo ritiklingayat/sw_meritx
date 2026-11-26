@@ -12,6 +12,11 @@ import Home from "./pages/public/Home";
 import Exams from "./pages/public/Exams";
 import ExamDetails from "./pages/public/ExamDetails";
 import Auth from "./pages/auth/Auth";
+import StudentLogin from "./pages/auth/StudentLogin";
+import StudentRegister from "./pages/auth/StudentRegister";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import TeacherLogin from "./pages/auth/TeacherLogin";
 import AdminLogin from "./pages/auth/AdminLogin";
 import Exam from "./pages/exam/Exam";
@@ -126,12 +131,15 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public Routes */}
+          {/* Public & Student Auth Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/exams" element={<Exams />} />
           <Route path="/exams/:id" element={<ExamDetails />} />
-          <Route path="/login" element={<Auth />} />
-          <Route path="/register" element={<Auth register />} />
+          <Route path="/login" element={<StudentLogin />} />
+          <Route path="/register" element={<StudentRegister />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Student Routes */}
           <Route

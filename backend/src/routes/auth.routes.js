@@ -14,4 +14,11 @@ router.post('/logout', AuthController.logout);
 router.post('/forgot-password', authRateLimiter, AuthController.forgotPassword);
 router.post('/reset-password', authRateLimiter, AuthController.resetPassword);
 
+// Dedicated Student Brevo OTP Authentication Routes
+router.post('/student/send-otp', authRateLimiter, AuthController.studentSendOtp);
+router.post('/student/verify-otp', authRateLimiter, AuthController.studentVerifyOtp);
+router.post('/student/resend-otp', authRateLimiter, AuthController.studentResendOtp);
+router.post('/student/complete-registration', authRateLimiter, AuthController.studentCompleteRegistration);
+router.post('/student/reset-password', authRateLimiter, AuthController.studentResetPassword);
+
 export default router;

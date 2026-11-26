@@ -22,6 +22,7 @@ import {
 import { SiteFooter, SiteHeader } from "../../components/Layouts";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
+import { evaluatePasswordCriteria, isValidEmail, maskEmailAddress } from "../../lib/passwordValidation";
 import { ExamCard } from "./Exams";
 import sliderUpsc from "../../assets/Images/Sliders/8-display.jpg";
 import sliderNeet from "../../assets/Images/Sliders/9-display.jpg";
@@ -64,7 +65,7 @@ const features = [
 ];
 
 export default function Home() {
-  const { user, token, login, logout } = useAuth();
+  const { user, token, login, logout, sendStudentOtp } = useAuth();
   const nav = useNavigate();
   const [active, setActive] = useState(0);
   const [exams, setExams] = useState([]);
@@ -76,8 +77,10 @@ export default function Home() {
   const [authTab, setAuthTab] = useState("login"); // 'login' or 'register'
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authConfirmPassword, setAuthConfirmPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authTarget, setAuthTarget] = useState("JEE Main");
+  const [authAgreeTerms, setAuthAgreeTerms] = useState(false);
   const [authShowPass, setAuthShowPass] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -108,9 +111,18 @@ export default function Home() {
     e.preventDefault();
     setAuthError("");
     setAuthNotice("");
+    const cleanEmail = authEmail.trim().toLowerCase();
+    if (!isValidEmail(cleanEmail)) {
+      setAuthError("Please enter a valid student email address.");
+      return;
+    }
+    if (!authPassword) {
+      setAuthError("Please enter your password.");
+      return;
+    }
     setAuthBusy(true);
     try {
-      const u = await login(authEmail, authPassword, "student");
+      const u = await login(cleanEmail, authPassword, "student");
       if (u?.role !== "student") {
         logout();
         setAuthError(
@@ -130,23 +142,55 @@ export default function Home() {
     e.preventDefault();
     setAuthError("");
     setAuthNotice("");
+
+    const cleanName = authName.trim();
+    const cleanEmail = authEmail.trim().toLowerCase();
+    const { isPasswordValid } = evaluatePasswordCriteria(authPassword, authConfirmPassword);
+
+    if (cleanName.length < 2) {
+      setAuthError("Please enter your full name (at least 2 characters).");
+      return;
+    }
+    if (!isValidEmail(cleanEmail)) {
+      setAuthError("Please enter a valid student email address.");
+      return;
+    }
+    if (!isPasswordValid) {
+      setAuthError("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
+      return;
+    }
+    if (authPassword !== authConfirmPassword) {
+      setAuthError("Password and Confirm Password do not match.");
+      return;
+    }
+    if (!authAgreeTerms) {
+      setAuthError("Please agree to the Terms & Conditions to continue.");
+      return;
+    }
+
     setAuthBusy(true);
     try {
-      await api("/auth/register", {
-        method: "POST",
-        body: {
-          name: authName,
-          email: authEmail,
-          password: authPassword,
+      const res = await sendStudentOtp({
+        name: cleanName,
+        email: cleanEmail,
+        target: authTarget,
+        purpose: "registration",
+      });
+      nav("/verify-email", {
+        state: {
+          name: cleanName,
+          email: cleanEmail,
           target: authTarget,
-          role: "student",
+          password: authPassword,
+          confirmPassword: authConfirmPassword,
+          purpose: "registration",
+          maskedEmail: res?.maskedEmail || maskEmailAddress(cleanEmail),
+          cooldownSeconds: res?.cooldownSeconds || 60,
+          initialNotice: "A 6-digit verification code has been sent to your email.",
         },
       });
-      // Automatically log the new student in
-      const u = await login(authEmail, authPassword, "student");
-      nav("/student");
     } catch (err) {
-      setAuthError(err.message || "Failed to create student account.");
+      setAuthError(err.message || "Failed to send verification code.");
     } finally {
       setAuthBusy(false);
     }
@@ -423,6 +467,12 @@ export default function Home() {
                         </div>
                       </div>
 
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px", marginTop: "-6px" }}>
+                        <Link to="/forgot-password" style={{ fontSize: "12.5px", fontWeight: 600, color: "#2563eb" }}>
+                          Forgot Password?
+                        </Link>
+                      </div>
+
                       <button
                         type="submit"
                         className="btn btn-primary home-auth-submit"
@@ -433,7 +483,7 @@ export default function Home() {
                       </button>
                     </form>
                   ) : (
-                    <form onSubmit={handleHomeStudentRegister}>
+                    <form onSubmit={handleHomeStudentRegister} noValidate>
                       <div className="field">
                         <label>Full Name</label>
                         <input
@@ -463,7 +513,7 @@ export default function Home() {
                             type={authShowPass ? "text" : "password"}
                             value={authPassword}
                             onChange={(e) => setAuthPassword(e.target.value)}
-                            placeholder="At least 8 characters"
+                            placeholder="8+ chars, upper, lower, number, symbol"
                             minLength={8}
                             required
                           />
@@ -475,6 +525,17 @@ export default function Home() {
                             {authShowPass ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
                         </div>
+                      </div>
+
+                      <div className="field">
+                        <label>Confirm Password</label>
+                        <input
+                          type={authShowPass ? "text" : "password"}
+                          value={authConfirmPassword}
+                          onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                          placeholder="Re-enter your password"
+                          required
+                        />
                       </div>
 
                       <div className="field">
@@ -490,12 +551,22 @@ export default function Home() {
                         </select>
                       </div>
 
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "#475569", marginBottom: "14px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={authAgreeTerms}
+                          onChange={(e) => setAuthAgreeTerms(e.target.checked)}
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <span>I agree to the Terms &amp; Conditions and Privacy Policy</span>
+                      </label>
+
                       <button
                         type="submit"
                         className="btn btn-primary home-auth-submit"
                         disabled={authBusy}
                       >
-                        {authBusy ? "Creating account..." : "Register Student Account"}{" "}
+                        {authBusy ? "Sending OTP via Brevo..." : "Send OTP & Continue"}{" "}
                         <ArrowRight size={16} />
                       </button>
                     </form>
